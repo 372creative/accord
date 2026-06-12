@@ -22,7 +22,7 @@ export const CURATED_LISTS: CuratedList[] = [
     title: 'Tobacco without heavy sweetness',
     description: 'Leaf and warmth — the least syrupy tobaccos in the library.',
     curator: 'M. Laurent',
-    fragranceIds: ['replica-jazz-club', 'parfums-de-marly-herod', 'xerjoff-naxos', 'john-varvatos-artisan-pure'],
+    fragranceIds: ['replica-jazz-club', 'le-labo-the-noir-29', 'xerjoff-naxos', 'guerlain-vetiver'],
     tags: ['Tobacco', 'Woody', 'Amber'],
     relatedGoals: ['Cold weather scent', 'Evening fragrance'],
   },
