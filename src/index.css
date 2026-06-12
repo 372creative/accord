@@ -1,0 +1,154 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #0e1117;
+  --color-bg2: #101319;
+  --color-card: #171b22;
+  --color-card2: #1b2028;
+  --color-elev: #20262f;
+  --color-line: rgba(255, 255, 255, 0.08);
+  --color-ink: #f4f1ea;
+  --color-ink2: #c9c9bc;
+  --color-mute: #8f948d;
+  --color-accent: #344c4d;
+  --color-accent2: #3f5b59;
+  --color-accent-ink: #dde3d1;
+  --color-sage: #c9d2bd;
+  --font-display: "Sora", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+html,
+body {
+  background: #090b0f;
+}
+
+body {
+  font-family: var(--font-body);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Rating slider */
+input[type="range"].rating {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 5px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    #3f5b59 0%,
+    #8da793 var(--fill, 50%),
+    rgba(255, 255, 255, 0.09) var(--fill, 50%)
+  );
+  outline: none;
+}
+input[type="range"].rating::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #c9d2bd;
+  border: 5px solid #20262f;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18), 0 4px 12px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+}
+input[type="range"].rating::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #c9d2bd;
+  border: 5px solid #20262f;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18), 0 4px 12px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.fade-up {
+  animation: fade-up 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Staggered page entrance: direct children rise in one after another.
+   Tab screens remount on switch, so this re-runs on every page change. */
+.stagger > * {
+  animation: fade-up 0.95s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.stagger > *:nth-child(1) {
+  animation-delay: 0.08s;
+}
+.stagger > *:nth-child(2) {
+  animation-delay: 0.21s;
+}
+.stagger > *:nth-child(3) {
+  animation-delay: 0.34s;
+}
+.stagger > *:nth-child(4) {
+  animation-delay: 0.47s;
+}
+.stagger > *:nth-child(5) {
+  animation-delay: 0.6s;
+}
+.stagger > *:nth-child(6) {
+  animation-delay: 0.72s;
+}
+.stagger > *:nth-child(7) {
+  animation-delay: 0.84s;
+}
+.stagger > *:nth-child(n + 8) {
+  animation-delay: 0.95s;
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+.sheet-up {
+  animation: sheet-up 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Trait bars grow from the left, one after another */
+@keyframes bar-grow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+.bar-grow {
+  transform-origin: left;
+  animation: bar-grow 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stagger > *,
+  .fade-up,
+  .sheet-up,
+  .bar-grow {
+    animation: none;
+  }
+}
