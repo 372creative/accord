@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../state/app';
 import { byId } from '../data/fragrances';
 import { CURATED_LISTS } from '../data/lists';
-import { listsForFragrance, matchFor, similarFragrances } from '../lib/recommendations';
+import { GOAL_FILTERS, listsForFragrance, matchFor, similarFragrances } from '../lib/recommendations';
 import { DECISION_TAGS, DISLIKE_CHIPS, LOVE_CHIPS } from '../data/options';
 import { Bottle } from '../components/Bottle';
 import {
@@ -28,22 +28,25 @@ export function FragranceDetail({ id }: { id: string }) {
   const relatedLists = listsForFragrance(id, CURATED_LISTS);
 
   const [editing, setEditing] = useState(false);
+  const [whyOpen, setWhyOpen] = useState(false);
+
+  const matchedGoals = answers.currentGoals.filter(
+    (g) =>
+      GOAL_FILTERS[g]?.(f) &&
+      !rec.signals.some((s) => s.toLowerCase().includes(g.toLowerCase()))
+  );
 
   return (
     <div className="fixed inset-0 z-40 mx-auto max-w-[430px] bg-bg overflow-y-auto no-scrollbar">
       {/* direct child of the scroller so it stays pinned for the whole page */}
-      <header className="sticky top-0 z-30 px-5 pt-5 flex items-center justify-between">
+      <header className="sticky top-0 z-30 px-5 pt-5">
+        {/* status chip lives in the hero (not here) so it can never overlap content */}
         <button
           onClick={pop}
           className="w-10 h-10 rounded-full bg-white/[0.06] backdrop-blur-xl border border-white/[0.1] flex items-center justify-center text-ink2"
         >
           <ChevronLeftIcon size={18} />
         </button>
-        {item && (
-          <Chip small tone="sage">
-            {item.status === 'wishlist' ? 'On try list' : statusLabel(item.status)}
-          </Chip>
-        )}
       </header>
       <div className="relative overflow-hidden pb-6 -mt-[60px]">
         <div
@@ -62,7 +65,14 @@ export function FragranceDetail({ id }: { id: string }) {
             <h1 className="mt-1.5 font-display font-medium text-[26px] leading-tight text-ink">
               {f.name}
             </h1>
-            <div className="mt-2 text-[12px] text-mute">{f.priceLabel} full bottle</div>
+            <div className="mt-2 text-[12px] text-mute flex items-center gap-2 flex-wrap">
+              <span>{f.priceLabel} full bottle</span>
+              {item && (
+                <Chip small tone="sage">
+                  {item.status === 'wishlist' ? 'On try list' : statusLabel(item.status)}
+                </Chip>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -79,7 +89,12 @@ export function FragranceDetail({ id }: { id: string }) {
                   </Chip>
                 ))}
               </div>
-              <MatchBadge value={rec.match} large />
+              <button onClick={() => setWhyOpen(true)} className="active:scale-95 transition">
+                <MatchBadge value={rec.match} large />
+                <div className="mt-1 text-[10px] text-sage font-medium text-right">
+                  Why this match?
+                </div>
+              </button>
             </div>
             <Divider className="my-4" />
             <SectionLabel>Why it fits</SectionLabel>
@@ -166,31 +181,44 @@ export function FragranceDetail({ id }: { id: string }) {
           </GlowCard>
         )}
 
-        {/* notes */}
+        {/* factual notes, separate from Accord's interpretation */}
         <GlowCard>
           <div className="p-5">
             <SectionLabel>Notes</SectionLabel>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {f.notes.map((n) => (
-                <Chip key={n} small>
-                  {n}
-                </Chip>
-              ))}
+            <div className="mt-3 space-y-3">
+              {(
+                [
+                  ['Top', f.topNotes],
+                  ['Heart', f.heartNotes],
+                  ['Base', f.baseNotes],
+                ] as const
+              ).map(
+                ([label, notes]) =>
+                  notes.length > 0 && (
+                    <div key={label} className="flex gap-3">
+                      <span className="w-11 shrink-0 text-[11px] text-mute pt-1.5">{label}</span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {notes.map((n) => (
+                          <Chip key={n} small>
+                            {n}
+                          </Chip>
+                        ))}
+                      </div>
+                    </div>
+                  )
+              )}
             </div>
-            <SectionLabel className="mt-5">Style</SectionLabel>
+
+            <Divider className="my-5" />
+
+            <SectionLabel>Accord reads it as</SectionLabel>
             <div className="mt-3 flex flex-wrap gap-2">
-              {f.styleTags.map((s) => (
+              {[...new Set([...f.styleTags.slice(0, 4), ...f.directions.slice(0, 3)])].map((s) => (
                 <Chip key={s} small tone="sage">
                   {s}
                 </Chip>
               ))}
-              {f.seasonTags
-                .filter((s) => !f.styleTags.includes(s))
-                .map((s) => (
-                  <Chip key={s} small>
-                    {s}
-                  </Chip>
-                ))}
+              <Chip small>{f.seasonTags.slice(0, 2).join(' / ') || 'All year'}</Chip>
             </div>
           </div>
         </GlowCard>
@@ -239,6 +267,47 @@ export function FragranceDetail({ id }: { id: string }) {
           </section>
         )}
       </div>
+
+      {/* why this match drawer */}
+      {whyOpen && (
+        <div className="fixed inset-0 z-50 mx-auto max-w-[430px] flex items-end">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setWhyOpen(false)} />
+          <div className="relative w-full rounded-t-[24px] bg-card2 border-t border-white/[0.1] p-6 pb-9 sheet-up">
+            <div className="mx-auto w-10 h-1 rounded-full bg-white/[0.12] mb-5" />
+            <h3 className="font-display font-medium text-[19px] text-ink">Why {rec.match}%?</h3>
+            <div className="mt-4 space-y-2.5">
+              {rec.signals.map((s) => (
+                <p key={s} className="text-[13px] leading-relaxed text-ink2 flex gap-2">
+                  <CheckIcon size={14} className="mt-0.5 shrink-0 text-sage" />
+                  <span>{s}</span>
+                </p>
+              ))}
+              {matchedGoals.map((g) => (
+                <p key={g} className="text-[13px] leading-relaxed text-ink2 flex gap-2">
+                  <CheckIcon size={14} className="mt-0.5 shrink-0 text-sage" />
+                  <span>Fits your {g.toLowerCase()} goal</span>
+                </p>
+              ))}
+              {rec.signals.length === 0 && matchedGoals.length === 0 && (
+                <p className="text-[13px] leading-relaxed text-mute">
+                  No strong taste signals yet — this score is mostly a baseline. Rating more
+                  fragrances sharpens it.
+                </p>
+              )}
+              {rec.caution && (
+                <p className="text-[13px] leading-relaxed text-[#c8a48b] flex gap-2">
+                  <InfoIcon size={14} className="mt-0.5 shrink-0" />
+                  <span>Caution: {rec.caution}</span>
+                </p>
+              )}
+            </div>
+            <p className="mt-5 text-[11px] text-mute leading-relaxed">
+              Match scores combine your reactions, boundaries, favourites, dislikes, goals, budget
+              and collection signals.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* sticky CTAs */}
       <div className="sticky bottom-0 bg-gradient-to-t from-bg via-bg/95 to-transparent px-5 pt-8 pb-7">

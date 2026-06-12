@@ -2,7 +2,7 @@ import React from 'react';
 import { useApp } from '../state/app';
 import { CURATED_LISTS } from '../data/lists';
 import { byId } from '../data/fragrances';
-import { listOverlap } from '../lib/recommendations';
+import { listOverlap, overlapLabel } from '../lib/recommendations';
 import { Bottle } from '../components/Bottle';
 import { HeaderBackdrop, SectionLabel } from '../components/ui';
 import { UserMenu } from '../components/UserMenu';
@@ -50,8 +50,8 @@ export function Discover() {
                     </div>
                     <div className="text-right shrink-0">
                       <div className="font-display font-medium text-[16px] text-sage">{overlap}%</div>
-                      <div className="text-[9px] uppercase tracking-[0.18em] text-mute">
-                        overlap
+                      <div className="text-[9px] uppercase tracking-[0.14em] text-mute whitespace-nowrap">
+                        {overlapLabel(overlap)}
                       </div>
                     </div>
                   </div>

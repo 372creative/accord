@@ -105,6 +105,14 @@ export const LogoutIcon = ({ size, ...p }: P) => (
   </svg>
 );
 
+export const DotsIcon = ({ size, ...p }: P) => (
+  <svg {...base(size)} {...p}>
+    <circle cx="12" cy="5" r="1" fill="currentColor" />
+    <circle cx="12" cy="12" r="1" fill="currentColor" />
+    <circle cx="12" cy="19" r="1" fill="currentColor" />
+  </svg>
+);
+
 export const InfoIcon = ({ size, ...p }: P) => (
   <svg {...base(size)} {...p}>
     <circle cx="12" cy="12" r="9" />

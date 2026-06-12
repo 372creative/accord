@@ -14,7 +14,7 @@ import {
   TasteProfile,
 } from '../types';
 import { EMPTY_ANSWERS, generateProfile } from '../logic/profile';
-import { buildBuckets } from '../lib/recommendations';
+import { buildBuckets, FeedbackMap } from '../lib/recommendations';
 import { VALID_IDS } from '../data/fragrances';
 
 export type Stage = 'onboarding' | 'result' | 'app';
@@ -39,6 +39,8 @@ interface AppState {
   itemFor: (fragranceId: string) => CollectionItem | undefined;
   setStatus: (fragranceId: string, status: CollectionStatus | null) => void;
   updateItem: (fragranceId: string, patch: Partial<CollectionItem>) => void;
+  feedback: FeedbackMap;
+  giveFeedback: (fragranceId: string, value: string) => void;
 }
 
 const Ctx = createContext<AppState | null>(null);
@@ -49,6 +51,7 @@ interface Persisted {
   stage: Stage;
   answers: OnboardingAnswers;
   collection: CollectionItem[];
+  feedback?: FeedbackMap;
 }
 
 /** Old mock-data ids → ids in the seed dataset (Cedrat Boise / Guilty Absolute
@@ -81,13 +84,18 @@ function migrate(p: Persisted): Persisted {
   return {
     ...p,
     answers: {
+      ...EMPTY_ANSWERS,
       ...p.answers,
+      // fields introduced by the nuanced reaction model
+      directionPreferences: p.answers.directionPreferences ?? [],
+      conditionalPreferences: p.answers.conditionalPreferences ?? {},
       favourites: picked(p.answers.favourites ?? []),
       dislikes: picked(p.answers.dislikes ?? []),
     },
     collection: (p.collection ?? [])
       .map((c) => ({ ...c, fragranceId: migrateId(c.fragranceId) ?? '' }))
       .filter((c) => c.fragranceId),
+    feedback: p.feedback ?? {},
   };
 }
 
@@ -113,8 +121,13 @@ function seedCollection(answers: OnboardingAnswers, existing: CollectionItem[]):
         id: newId(),
         fragranceId: f.fragranceId,
         status: 'own',
-        rating: 8.5,
-        decisionTag: 'Would buy again',
+        rating: f.wouldBuyAgain === 'no' ? 7 : 8.5,
+        decisionTag:
+          f.wouldBuyAgain === 'no'
+            ? 'Good, but redundant'
+            : f.wouldBuyAgain === 'maybe'
+              ? 'Keeper'
+              : 'Would buy again',
         likedChips: f.reasons,
         dislikedChips: [],
         lastUpdated: now,
@@ -143,24 +156,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [stage, setStage] = useState<Stage>(saved?.stage ?? 'onboarding');
   const [answers, setAnswers] = useState<OnboardingAnswers>(saved?.answers ?? EMPTY_ANSWERS);
   const [collection, setCollection] = useState<CollectionItem[]>(saved?.collection ?? []);
+  const [feedback, setFeedback] = useState<FeedbackMap>(saved?.feedback ?? {});
   const [tab, setTab] = useState<Tab>('foryou');
   const [overlays, setOverlays] = useState<Overlay[]>([]);
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ stage, answers, collection }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ stage, answers, collection, feedback }));
     } catch {
       /* private mode etc. */
     }
-  }, [stage, answers, collection]);
+  }, [stage, answers, collection, feedback]);
 
   const profile = useMemo(
     () => (stage === 'onboarding' ? null : generateProfile(answers)),
     [stage, answers]
   );
   const buckets = useMemo(
-    () => (stage === 'app' || stage === 'result' ? buildBuckets(answers, collection) : []),
-    [stage, answers, collection]
+    () => (stage === 'app' || stage === 'result' ? buildBuckets(answers, collection, feedback) : []),
+    [stage, answers, collection, feedback]
   );
 
   const completeOnboarding = useCallback((a: OnboardingAnswers) => {
@@ -207,6 +221,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const giveFeedback = useCallback(
+    (fragranceId: string, value: string) => {
+      if (value === 'Own it') setStatus(fragranceId, 'own');
+      else if (value === 'Already tried') setStatus(fragranceId, 'sampled');
+      setFeedback((m) => ({ ...m, [fragranceId]: value }));
+    },
+    [setStatus]
+  );
+
   const updateItem = useCallback((fragranceId: string, patch: Partial<CollectionItem>) => {
     setCollection((items) =>
       items.map((i) =>
@@ -235,6 +258,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     itemFor,
     setStatus,
     updateItem,
+    feedback,
+    giveFeedback,
   };
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

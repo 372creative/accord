@@ -102,6 +102,111 @@ export const GOALS = [
   'Build a small wardrobe',
 ];
 
+export const REACTIONS: { id: string; label: string; score: number }[] = [
+  { id: 'avoid', label: 'Avoid', score: -10 },
+  { id: 'not_for_me', label: 'Not for me', score: -5 },
+  { id: 'depends', label: 'Depends', score: 2 },
+  { id: 'enjoy', label: 'Enjoy', score: 7 },
+  { id: 'love', label: 'Love', score: 10 },
+];
+
+/** Directions that get a "Set your boundaries" follow-up when rated "Depends". */
+export const POLARISING_DIRECTIONS = [
+  'Sweet',
+  'Vanilla',
+  'Amber',
+  'Oud',
+  'Leather',
+  'Powdery',
+  'Fresh / aquatic',
+  'Smoky / incense',
+  'Floral',
+];
+
+export interface ConditionalOptions {
+  question: string;
+  helper?: string;
+  worksForMe: string[];
+  notForMe: string[];
+}
+
+export const CONDITIONAL_OPTIONS: Record<string, ConditionalOptions> = {
+  Sweet: {
+    question: 'What kind of sweetness works for you?',
+    helper: 'Sweetness can be elegant or too much. Tell Accord where the line is.',
+    worksForMe: [
+      'Restrained sweetness',
+      'Tobacco sweetness',
+      'Amber sweetness',
+      'Boozy sweetness',
+      'Warm spicy sweetness',
+      'Light vanilla',
+    ],
+    notForMe: [
+      'Syrupy sweetness',
+      'Bubblegum / candy',
+      'Heavy gourmand',
+      'Synthetic sweetness',
+      'Fruity sweetness',
+      'Overly sweet club scents',
+    ],
+  },
+  'Fresh / aquatic': {
+    question: 'What kind of freshness works for you?',
+    worksForMe: ['Salty aquatic', 'Mineral fresh', 'Citrus fresh', 'Green fresh', 'Clean musky fresh'],
+    notForMe: [
+      'Blue shower-gel freshness',
+      'Generic aquatic',
+      'Synthetic ambroxan freshness',
+      'Too sporty',
+      'Too soapy',
+    ],
+  },
+  Oud: {
+    question: 'What kind of oud works for you?',
+    worksForMe: ['Smooth oud', 'Woody oud', 'Rose-oud if balanced', 'Dry oud', 'Incense oud'],
+    notForMe: ['Barnyard oud', 'Medicinal oud', 'Overpowering oud', 'Sweet oud', 'Too animalic'],
+  },
+  Leather: {
+    question: 'What kind of leather works for you?',
+    worksForMe: ['Smooth leather', 'Suede', 'Dry leather', 'Tobacco leather', 'Elegant leather'],
+    notForMe: ['Harsh leather', 'Animalic leather', 'Smoky leather overload', 'Rubber-like leather'],
+  },
+  Powdery: {
+    question: 'What kind of powder works for you?',
+    worksForMe: ['Clean powder', 'Iris powder', 'Soft elegant powder', 'Barbershop powder'],
+    notForMe: ['Makeup powder', 'Dusty powder', 'Old-fashioned powder', 'Too dry / chalky'],
+  },
+  'Smoky / incense': {
+    question: 'What kind of smoke works for you?',
+    worksForMe: ['Dry incense', 'Churchy incense', 'Resinous smoke', 'Tobacco smoke', 'Subtle smokiness'],
+    notForMe: ['Campfire smoke', 'Ashtray smoke', 'Burnt rubber', 'Too heavy incense'],
+  },
+  Amber: {
+    question: 'What kind of amber works for you?',
+    worksForMe: ['Dry amber', 'Resinous amber', 'Spicy amber', 'Tobacco amber'],
+    notForMe: ['Syrupy amber', 'Very sweet amber', 'Heavy vanilla amber', 'Sticky amber'],
+  },
+  Vanilla: {
+    question: 'What kind of vanilla works for you?',
+    worksForMe: ['Dry vanilla', 'Spiced vanilla', 'Tobacco vanilla', 'Light vanilla'],
+    notForMe: ['Cupcake vanilla', 'Heavy gourmand vanilla', 'Syrupy vanilla', 'Synthetic vanilla'],
+  },
+  Floral: {
+    question: 'What kind of floral works for you?',
+    worksForMe: ['Fresh floral', 'Clean neroli', 'Iris', 'Geranium', 'Lavender'],
+    notForMe: ['Heavy rose', 'Sweet white florals', 'Powdery florals', 'Too feminine / cosmetic'],
+  },
+};
+
+export const CARD_FEEDBACK_OPTIONS = [
+  'Not for me',
+  'Too sweet',
+  'Too common',
+  'Already tried',
+  'Own it',
+] as const;
+
 export const PROJECTION_LEVELS = [
   'Very subtle',
   'Noticeable but tasteful',

@@ -27,28 +27,58 @@ export function ProfileResult() {
 
           <Divider className="my-5" />
 
-          <SectionLabel>Dominant preferences</SectionLabel>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {profile.dominant.map((d) => (
-              <Chip key={d} small tone="sage">
-                {d}
-              </Chip>
-            ))}
-          </div>
+          {profile.loves.length > 0 && (
+            <>
+              <SectionLabel>You tend to love</SectionLabel>
+              <div className="mt-3 mb-5 flex flex-wrap gap-2">
+                {profile.loves.map((d) => (
+                  <Chip key={d} small tone="sage">
+                    {d}
+                  </Chip>
+                ))}
+              </div>
+            </>
+          )}
 
-          <SectionLabel className="mt-5">Usually avoids</SectionLabel>
+          {profile.enjoys.length > 0 && (
+            <>
+              <SectionLabel>You enjoy</SectionLabel>
+              <div className="mt-3 mb-5 flex flex-wrap gap-2">
+                {profile.enjoys.map((d) => (
+                  <Chip key={d} small>
+                    {d}
+                  </Chip>
+                ))}
+              </div>
+            </>
+          )}
+
+          {profile.dependsOn.length > 0 && (
+            <>
+              <SectionLabel>Depends</SectionLabel>
+              <div className="mt-3 mb-5 space-y-2">
+                {profile.dependsOn.map((d) => (
+                  <p key={d.name} className="text-[12px] leading-relaxed text-ink2">
+                    <span className="text-ink font-medium">{d.name}:</span>{' '}
+                    {d.works.length > 0
+                      ? `works when ${d.works.slice(0, 3).join(', ').toLowerCase()}`
+                      : 'depends on the style'}
+                    {d.avoid.length > 0 && (
+                      <span className="text-[#c8a48b]">
+                        {' '}
+                        · avoid {d.avoid.slice(0, 2).join(', ').toLowerCase()}
+                      </span>
+                    )}
+                  </p>
+                ))}
+              </div>
+            </>
+          )}
+
+          <SectionLabel>Usually avoids</SectionLabel>
           <div className="mt-3 flex flex-wrap gap-2">
             {profile.avoids.map((d) => (
               <Chip key={d} small tone="warn">
-                {d}
-              </Chip>
-            ))}
-          </div>
-
-          <SectionLabel className="mt-5">Best directions</SectionLabel>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {profile.bestDirections.map((d) => (
-              <Chip key={d} small>
                 {d}
               </Chip>
             ))}
@@ -68,7 +98,7 @@ export function ProfileResult() {
           <div className="flex items-center justify-between">
             <div>
               <SectionLabel>Profile strength</SectionLabel>
-              <p className="mt-1 text-[11px] text-mute">Grows as you rate and react</p>
+              <p className="mt-1 text-[11px] text-mute max-w-[200px]">{profile.strengthHint}</p>
             </div>
             <div className="font-display font-medium text-[23px] text-sage">
               {profile.strength}%

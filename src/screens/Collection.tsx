@@ -10,12 +10,33 @@ import { ChevronRightIcon } from '../components/icons';
 const SEGMENTS: { id: CollectionStatus; label: string }[] = [
   { id: 'own', label: 'Own' },
   { id: 'sampled', label: 'Sampled' },
-  { id: 'wishlist', label: 'Wishlist' },
+  { id: 'wishlist', label: 'Try List' },
   { id: 'sold', label: 'Had / Sold' },
 ];
 
+const EMPTY_STATES: Record<
+  CollectionStatus,
+  { copy: string; cta?: { label: string; action: 'foryou' | 'trylist' } }
+> = {
+  own: {
+    copy: 'Your owned fragrances shape your recommendations most. Add the scents you actually wear or would buy again.',
+    cta: { label: 'Browse recommendations', action: 'foryou' },
+  },
+  sampled: {
+    copy: "Track what you've tested — even the bad ones help Accord learn.",
+    cta: { label: 'View Try List', action: 'trylist' },
+  },
+  wishlist: {
+    copy: "Fragrances you're considering sampling next.",
+    cta: { label: 'Browse recommendations', action: 'foryou' },
+  },
+  sold: {
+    copy: 'Decluttered scents still help Accord understand what not to recommend.',
+  },
+};
+
 export function Collection() {
-  const { collection, push } = useApp();
+  const { collection, push, setTab } = useApp();
   const [segment, setSegment] = useState<CollectionStatus>('own');
 
   const items = collection.filter((i) => i.status === segment);
@@ -93,15 +114,21 @@ export function Collection() {
         {items.length === 0 && (
           <div className="text-center pt-16">
             <SectionLabel>Nothing here yet</SectionLabel>
-            <p className="mt-3 text-[13px] text-mute leading-relaxed max-w-[260px] mx-auto">
-              {segment === 'wishlist'
-                ? 'Add recommendations to your try list and they will land here.'
-                : segment === 'own'
-                ? 'Fragrances you own will appear here. Add them from any fragrance page.'
-                : segment === 'sampled'
-                ? 'Tried something? Mark it as sampled to teach Accord faster.'
-                : 'Moved on from a bottle? Track it here — it still informs your profile.'}
+            <p className="mt-3 text-[13px] text-mute leading-relaxed max-w-[270px] mx-auto">
+              {EMPTY_STATES[segment].copy}
             </p>
+            {EMPTY_STATES[segment].cta && (
+              <button
+                onClick={() =>
+                  EMPTY_STATES[segment].cta!.action === 'foryou'
+                    ? setTab('foryou')
+                    : setSegment('wishlist')
+                }
+                className="mt-5 rounded-[13px] bg-white/[0.05] border border-white/[0.08] text-sage font-display font-medium text-[13px] px-5 py-3 active:scale-95 transition"
+              >
+                {EMPTY_STATES[segment].cta!.label}
+              </button>
+            )}
           </div>
         )}
       </div>

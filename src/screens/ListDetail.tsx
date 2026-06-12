@@ -1,7 +1,7 @@
 import React from 'react';
 import { useApp } from '../state/app';
 import { listById } from '../data/lists';
-import { listOverlap, matchFor } from '../lib/recommendations';
+import { listOverlap, matchFor, overlapLabel } from '../lib/recommendations';
 import { RecommendationCard } from '../components/RecommendationCard';
 import { Chip, SectionLabel } from '../components/ui';
 import { ChevronLeftIcon } from '../components/icons';
@@ -34,7 +34,7 @@ export function ListDetail({ id }: { id: string }) {
           <p className="mt-2.5 text-[14px] text-mute leading-relaxed">{list.description}</p>
           <div className="mt-4 flex items-center gap-3">
             <Chip small tone="sage">
-              {overlap}% taste overlap
+              {overlap}% overlap · {overlapLabel(overlap)}
             </Chip>
             <span className="text-[12px] text-mute">{list.fragranceIds.length} fragrances</span>
           </div>
