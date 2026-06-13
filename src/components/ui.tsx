@@ -3,13 +3,18 @@ import React, { useEffect, useRef } from 'react';
 export function SectionLabel({
   children,
   className = '',
+  accent = false,
 }: {
   children: React.ReactNode;
   className?: string;
+  /** Use the cream-green accent colour (matches the primary CTA text). */
+  accent?: boolean;
 }) {
   return (
     <div
-      className={`font-display text-[11px] font-medium uppercase tracking-[0.14em] text-[#a6ab9f] ${className}`}
+      className={`font-display text-[11px] font-medium uppercase tracking-[0.14em] ${
+        accent ? 'text-accent-ink' : 'text-[#a6ab9f]'
+      } ${className}`}
     >
       {children}
     </div>
@@ -183,10 +188,10 @@ export function ChipGroup({
 export function MatchBadge({ value, large }: { value: number; large?: boolean }) {
   return (
     <div className="text-right shrink-0">
-      <div className={`font-display font-medium text-ink ${large ? 'text-[18px] leading-5' : 'text-[16px] leading-5'}`}>
+      <div className={`font-display font-medium text-ink ${large ? 'text-[27px] leading-7' : 'text-[16px] leading-5'}`}>
         {value}%
       </div>
-      <div className="text-[10px] leading-3 uppercase tracking-[0.22em] text-mute font-medium">match</div>
+      <div className="text-[10px] leading-3 mt-0.5 uppercase tracking-[0.22em] text-mute font-medium">match</div>
     </div>
   );
 }

@@ -70,6 +70,29 @@ const COUNTRY_INFO: Record<string, CountryInfo> = {
 
 export const COUNTRIES = Object.keys(COUNTRY_INFO).sort();
 
+/** ISO 3166-1 alpha-2 codes for flag emoji. */
+const COUNTRY_ISO: Record<string, string> = {
+  Estonia: 'EE', Finland: 'FI', Sweden: 'SE', Norway: 'NO', Latvia: 'LV', Lithuania: 'LT',
+  Denmark: 'DK', Iceland: 'IS', Canada: 'CA', 'United Kingdom': 'GB', Ireland: 'IE',
+  Germany: 'DE', Netherlands: 'NL', Belgium: 'BE', France: 'FR', Poland: 'PL',
+  'Czech Republic': 'CZ', Austria: 'AT', Switzerland: 'CH', Hungary: 'HU', Slovakia: 'SK',
+  Ukraine: 'UA', 'United States': 'US', Japan: 'JP', 'South Korea': 'KR', 'New Zealand': 'NZ',
+  Spain: 'ES', Italy: 'IT', Greece: 'GR', Portugal: 'PT', Malta: 'MT', Croatia: 'HR',
+  Cyprus: 'CY', Turkey: 'TR', Australia: 'AU', Thailand: 'TH', Singapore: 'SG', Malaysia: 'MY',
+  Indonesia: 'ID', Philippines: 'PH', Vietnam: 'VN', India: 'IN', Brazil: 'BR', Mexico: 'MX',
+  'United Arab Emirates': 'AE', 'Saudi Arabia': 'SA', Qatar: 'QA', Kuwait: 'KW', Bahrain: 'BH',
+  Oman: 'OM', Egypt: 'EG', 'South Africa': 'ZA',
+};
+
+/** Country name → flag emoji (regional-indicator pair). Empty string if unknown. */
+export function countryFlag(country?: string): string {
+  const iso = country ? COUNTRY_ISO[country] : undefined;
+  if (!iso) return '';
+  return iso
+    .toUpperCase()
+    .replace(/./g, (c) => String.fromCodePoint(127397 + c.charCodeAt(0)));
+}
+
 /** Fill in climate / market / currency from a country name (soft fallback). */
 export function inferLocation(country: string, city?: string): UserLocation {
   const info = COUNTRY_INFO[country];

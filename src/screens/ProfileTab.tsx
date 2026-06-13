@@ -10,7 +10,7 @@ import {
 } from '../components/ui';
 import { TraitBars } from '../components/TraitBars';
 import { UserMenu } from '../components/UserMenu';
-import { AGE_RANGES, GENDERS, ORIENTATIONS } from '../data/options';
+import { AGE_RANGES, GENDERS } from '../data/options';
 import { CLIMATE_LABELS } from '../data/geo';
 
 export function ProfileTab() {
@@ -20,10 +20,6 @@ export function ProfileTab() {
   const loc = answers.location;
   const prefRows: { label: string; value: string }[] = [
     { label: 'Gender', value: GENDERS.find((g) => g.id === answers.gender)?.label ?? '—' },
-    {
-      label: 'Framing',
-      value: ORIENTATIONS.find((o) => o.id === answers.fragranceOrientation)?.label ?? '—',
-    },
     { label: 'Age range', value: AGE_RANGES.find((a) => a.id === answers.ageRange)?.label ?? '—' },
     {
       label: 'Location',

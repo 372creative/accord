@@ -27,7 +27,7 @@ export function ListDetail({ id }: { id: string }) {
         <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-[360px] h-[300px] rounded-full bg-accent2/25 blur-[90px] pointer-events-none" />
         <div className="absolute inset-x-0 bottom-0 h-36 bg-gradient-to-b from-transparent to-bg pointer-events-none" />
         <div className="px-6 pt-[84px] pb-7 relative">
-          <SectionLabel>Curated list · {list.curator}</SectionLabel>
+          <SectionLabel accent>Curated list</SectionLabel>
           <h1 className="mt-2 font-display font-medium text-[27px] leading-tight text-ink">
             {list.title}
           </h1>

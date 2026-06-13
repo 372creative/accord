@@ -41,7 +41,7 @@ export function ForYou() {
         <div className="rounded-[18px] p-px bg-gradient-to-b from-white/[0.1] to-transparent">
           <div className="rounded-[17px] bg-card px-5 py-4 flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <SectionLabel>Your profile</SectionLabel>
+              <SectionLabel accent>Your profile</SectionLabel>
               <p className="mt-1.5 text-[13px] text-ink2 truncate">{tasteLine}</p>
             </div>
             <button
@@ -57,7 +57,7 @@ export function ForYou() {
         {buckets.map((bucket, bi) =>
           bucket.layout === 'large' ? (
             <section key={bucket.id}>
-              <SectionLabel>{bucket.title}</SectionLabel>
+              <SectionLabel accent>{bucket.title}</SectionLabel>
               <p className="mt-1 text-[12px] text-mute">{bucket.subtitle}</p>
               <div className="mt-4 space-y-5 stagger">
                 {bucket.recs.map((r) => (
@@ -67,7 +67,7 @@ export function ForYou() {
             </section>
           ) : (
             <section key={bucket.id}>
-              <SectionLabel>{bucket.title}</SectionLabel>
+              <SectionLabel accent>{bucket.title}</SectionLabel>
               <p className="mt-1 text-[12px] text-mute">{bucket.subtitle}</p>
               <div className="mt-4 -mx-5 px-5 flex gap-3 overflow-x-auto no-scrollbar stagger">
                 {bucket.recs.map((r) => (

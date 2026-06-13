@@ -35,26 +35,8 @@ export interface Fragrance {
   imageFileName?: string;
   /** Resolved image path under /public/fragrances; falls back to the SVG bottle if missing. */
   image?: string;
-  /** Future retailer/wholesaler readiness — not user-facing terminology. */
-  availability?: {
-    marketRegions?: string[];
-    retailers?: {
-      name: string;
-      region: string;
-      country?: string;
-      url?: string;
-      priceFrom?: number;
-      currency?: string;
-      sampleAvailable?: boolean;
-    }[];
-    wholesalers?: {
-      name: string;
-      region: string;
-      country?: string;
-      available?: boolean;
-      notes?: string;
-    }[];
-  };
+  /** Retailer / sample availability (UI only — never affects match score). */
+  availability?: Availability;
   // ---- derived fields (computed at conversion time) ----
   /** The app's 18-direction taste taxonomy, derived from accords/styles/notes. */
   directions: string[];
@@ -66,6 +48,64 @@ export interface Fragrance {
   notes: string[];
   /** Alias of accordProfile, used by cards. */
   accords: string[];
+}
+
+// ---------------------------------------------------------------------------
+// Retailer / sample availability (UI layer only — never affects match score)
+// ---------------------------------------------------------------------------
+
+export type RetailerRegion = 'EU' | 'UK' | 'US' | 'SEA' | 'MENA' | 'OTHER';
+
+export interface SampleLink {
+  id: string;
+  retailerName: string;
+  type: 'sample' | 'decant' | 'discovery_set';
+  region: RetailerRegion;
+  country?: string;
+  size?: string;
+  price?: number;
+  currency?: string;
+  url?: string;
+  affiliateUrl?: string;
+  inStock?: boolean;
+  sponsored?: boolean;
+}
+
+export interface FullBottleLink {
+  id: string;
+  retailerName: string;
+  type: 'full_bottle';
+  region: RetailerRegion;
+  country?: string;
+  size?: string;
+  price?: number;
+  currency?: string;
+  url?: string;
+  affiliateUrl?: string;
+  inStock?: boolean;
+  sponsored?: boolean;
+}
+
+export interface RetailerLink {
+  id: string;
+  retailerName: string;
+  region: RetailerRegion;
+  country?: string;
+  url?: string;
+  affiliateUrl?: string;
+  priceFrom?: number;
+  currency?: string;
+  sampleAvailable?: boolean;
+  fullBottleAvailable?: boolean;
+  inStock?: boolean;
+  sponsored?: boolean;
+}
+
+export interface Availability {
+  marketRegions?: string[];
+  sampleLinks?: SampleLink[];
+  fullBottleLinks?: FullBottleLink[];
+  retailerLinks?: RetailerLink[];
 }
 
 export type CollectionStatus = 'own' | 'sampled' | 'wishlist' | 'sold';

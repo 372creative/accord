@@ -17,6 +17,9 @@ import {
 } from '../components/ui';
 import { CheckIcon, ChevronLeftIcon, ChevronRightIcon, HeartIcon, InfoIcon } from '../components/icons';
 import { RatingControl } from '../components/RatingControl';
+import { AvailabilitySection } from '../components/AvailabilitySection';
+import { hasSampleAvailable } from '../lib/availability';
+import { RetailerRegion } from '../types';
 
 export function FragranceDetail({ id }: { id: string }) {
   const { pop, push, answers, collection, itemFor, setStatus, updateItem } = useApp();
@@ -29,6 +32,8 @@ export function FragranceDetail({ id }: { id: string }) {
 
   const [editing, setEditing] = useState(false);
   const [whyOpen, setWhyOpen] = useState(false);
+  const marketRegion = answers.location?.marketRegion as RetailerRegion | undefined;
+  const sampleable = hasSampleAvailable(f, marketRegion);
 
   const matchedGoals = answers.currentGoals.filter(
     (g) =>
@@ -248,42 +253,10 @@ export function FragranceDetail({ id }: { id: string }) {
           </section>
         )}
 
-        {/* availability — sample-first, future retailer readiness */}
-        <GlowCard>
-          <div className="p-5">
-            <SectionLabel>Where to sample or buy</SectionLabel>
-            {f.availability?.retailers?.length ? (
-              <div className="mt-3 space-y-2.5">
-                {f.availability.retailers.map((r) => (
-                  <div
-                    key={r.name}
-                    className="rounded-[14px] bg-bg2 border border-white/[0.07] px-4 py-3 flex items-center justify-between gap-3"
-                  >
-                    <div className="min-w-0">
-                      <div className="text-[14px] font-medium text-ink truncate">{r.name}</div>
-                      <div className="text-[11px] text-mute mt-0.5">
-                        {r.priceFrom ? `From ${r.priceFrom} ${r.currency ?? ''} · ` : ''}
-                        {r.region}
-                        {r.sampleAvailable ? ' · Samples available' : ''}
-                      </div>
-                    </div>
-                    <span className="shrink-0 text-[12px] font-display font-medium text-sage">
-                      View retailer
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="mt-3 text-[13px] leading-relaxed text-mute">
-                {answers.location?.country
-                  ? `Sample options will appear here when available in ${
-                      answers.location.country
-                    }${answers.location.marketRegion ? ` / ${answers.location.marketRegion}` : ''}.`
-                  : 'Retailer availability coming soon for your region.'}
-              </p>
-            )}
-          </div>
-        </GlowCard>
+        {/* availability — sample-first retailer layer */}
+        <div id="availability">
+          <AvailabilitySection fragrance={f} />
+        </div>
 
         {/* related lists */}
         {relatedLists.length > 0 && (
@@ -372,6 +345,16 @@ export function FragranceDetail({ id }: { id: string }) {
           <PrimaryButton className="w-full" onClick={() => setEditing(true)}>
             Update my take
           </PrimaryButton>
+        )}
+        {sampleable && (
+          <button
+            onClick={() =>
+              document.getElementById('availability')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            }
+            className="mt-3 w-full text-center text-[13px] font-display font-medium text-sage py-1"
+          >
+            Find sample
+          </button>
         )}
       </div>
     </div>

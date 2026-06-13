@@ -144,11 +144,27 @@ input[type="range"].rating::-moz-range-thumb {
   animation: bar-grow 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+/* Bottle-colour glow inside recommendation cards — blooms in after the card lands */
+@keyframes glow-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 0.3;
+  }
+}
+.glow-in {
+  opacity: 0.3;
+  animation: glow-in 1.2s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: 0.18s;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .stagger > *,
   .fade-up,
   .sheet-up,
-  .bar-grow {
+  .bar-grow,
+  .glow-in {
     animation: none;
   }
 }

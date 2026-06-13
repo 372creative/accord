@@ -5,7 +5,7 @@ import { useApp } from '../state/app';
 import { CARD_FEEDBACK_OPTIONS } from '../data/options';
 import { Bottle } from './Bottle';
 import { Chip, Divider, GlowCard, MatchBadge } from './ui';
-import { CheckIcon, DotsIcon, HeartIcon, InfoIcon } from './icons';
+import { CheckIcon, DotsIcon, HeartIcon } from './icons';
 
 export function RecommendationCard({ rec }: { rec: Recommendation }) {
   const f = byId(rec.fragranceId);
@@ -18,6 +18,14 @@ export function RecommendationCard({ rec }: { rec: Recommendation }) {
   return (
     <GlowCard glow>
       <div className="p-5 relative">
+        {/* bottle-colour glow from the top-left corner, fades in with the card */}
+        <div className="absolute inset-0 rounded-[19px] overflow-hidden pointer-events-none">
+          <div
+            className="glow-in absolute -top-12 -left-12 w-48 h-48 rounded-full blur-[55px] z-0"
+            style={{ background: f.colors[0] }}
+          />
+        </div>
+
         {/* lightweight recommendation feedback */}
         <button
           onClick={(e) => {
@@ -49,7 +57,7 @@ export function RecommendationCard({ rec }: { rec: Recommendation }) {
           </>
         )}
 
-        <div className="flex items-center gap-4 pr-8" onClick={() => push({ type: 'fragrance', id: f.id })}>
+        <div className="relative z-[1] flex items-center gap-4 pr-8" onClick={() => push({ type: 'fragrance', id: f.id })}>
           <div className="shrink-0 -my-1">
             <Bottle fragrance={f} size={62} />
           </div>
@@ -63,9 +71,9 @@ export function RecommendationCard({ rec }: { rec: Recommendation }) {
           </div>
         </div>
 
-        <Divider className="my-4" />
+        <Divider className="my-4 relative z-[1]" />
 
-        <div className="flex items-start justify-between gap-3">
+        <div className="relative z-[1] flex items-center justify-between gap-3">
           <div className="flex flex-wrap gap-2 max-w-[230px]">
             {f.accords.slice(0, 3).map((a) => (
               <Chip key={a} small>
@@ -76,16 +84,9 @@ export function RecommendationCard({ rec }: { rec: Recommendation }) {
           <MatchBadge value={rec.match} large />
         </div>
 
-        <p className="mt-4 text-[13px] leading-relaxed text-ink2">{rec.whyItFits}</p>
-        {rec.caution && (
-          <p className="mt-2 text-[12px] leading-relaxed text-[#c8a48b] flex gap-1.5">
-            <InfoIcon size={14} className="mt-0.5 shrink-0" />
-            <span>{rec.caution}</span>
-          </p>
-        )}
-        <Divider className="my-4" />
+        <Divider className="my-4 relative z-[1]" />
 
-        <div className="flex gap-3">
+        <div className="relative z-[1] flex gap-3">
           <button
             onClick={() => push({ type: 'fragrance', id: f.id })}
             className="flex-1 rounded-[13px] bg-white/[0.05] border border-white/[0.07] text-ink2 font-display font-medium text-[14px] py-3 active:scale-[0.98] transition"

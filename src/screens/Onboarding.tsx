@@ -20,12 +20,11 @@ import {
   GENDERS,
   GOALS,
   LOVE_CHIPS,
-  ORIENTATIONS,
   POLARISING_DIRECTIONS,
   PROJECTION_LEVELS,
   REACTIONS,
 } from '../data/options';
-import { COUNTRIES, inferLocation } from '../data/geo';
+import { COUNTRIES, countryFlag, inferLocation } from '../data/geo';
 import { findById, FRAGRANCES } from '../data/fragrances';
 import { Bottle } from '../components/Bottle';
 import { Chip, ChipGroup, HeaderBackdrop, PrimaryButton, SectionLabel } from '../components/ui';
@@ -35,13 +34,12 @@ import {
   PlusIcon,
   SearchIcon,
   SparkleIcon,
-  UnisexIcon,
   VenusIcon,
   XIcon,
 } from '../components/icons';
 
-const TOTAL_STEPS = 14;
-const BOUNDARIES_STEP = 11;
+const TOTAL_STEPS = 13;
+const BOUNDARIES_STEP = 10;
 
 export function Onboarding() {
   const { answers, completeOnboarding } = useApp();
@@ -85,31 +83,29 @@ export function Onboarding() {
       case 1:
         return !!draft.gender;
       case 2:
-        return !!draft.fragranceOrientation;
-      case 3:
         return !!draft.ageRange;
-      case 4:
+      case 3:
         return !!draft.location?.country;
-      case 5:
+      case 4:
         return !!draft.experienceLevel;
-      case 6:
+      case 5:
         return !!draft.collectionSize;
-      case 7:
+      case 6:
         return !!draft.budgetRange && !!draft.openToClones;
-      case 8:
+      case 7:
         return draft.favourites.length > 0;
-      case 9:
+      case 8:
         return draft.dislikes.length > 0;
-      case 12:
+      case 11:
         return draft.currentGoals.length > 0;
-      case 13:
+      case 12:
         return !!draft.projection;
       default:
         return true;
     }
   })();
 
-  const skippable = step === 8 || step === 9;
+  const skippable = step === 7 || step === 8;
 
   return (
     <div className="min-h-dvh flex flex-col px-6 pb-8">
@@ -149,27 +145,6 @@ export function Onboarding() {
         )}
         {step === 2 && (
           <SingleSelect
-            title="How should Accord frame recommendations for you?"
-            helper="This helps us tune the balance between masculine, feminine and unisex recommendations."
-            options={ORIENTATIONS.map((o) => o.label)}
-            value={ORIENTATIONS.find((o) => o.id === draft.fragranceOrientation)?.label}
-            onChange={(v) =>
-              set(
-                'fragranceOrientation',
-                ORIENTATIONS.find((o) => o.label === v)!.id as OnboardingAnswers['fragranceOrientation']
-              )
-            }
-            icons={{
-              'Masculine-leaning': <MarsIcon size={18} />,
-              'Feminine-leaning': <VenusIcon size={18} />,
-              Unisex: <UnisexIcon size={18} />,
-              'No preference': <SparkleIcon size={17} />,
-              "I'll decide per fragrance": <SparkleIcon size={17} />,
-            }}
-          />
-        )}
-        {step === 3 && (
-          <SingleSelect
             title="What age range are you in?"
             helper="This helps Accord tune recommendation tone — from beginner-friendly fresh scents to more mature classics."
             options={AGE_RANGES.map((a) => a.label)}
@@ -179,10 +154,10 @@ export function Onboarding() {
             }
           />
         )}
-        {step === 4 && (
+        {step === 3 && (
           <LocationStep value={draft.location} onChange={(v) => set('location', v)} />
         )}
-        {step === 5 && (
+        {step === 4 && (
           <SingleSelect
             title="How deep are you into fragrances?"
             helper="This helps Accord decide how specific or beginner-friendly your recommendations should be."
@@ -191,7 +166,7 @@ export function Onboarding() {
             onChange={(v) => set('experienceLevel', v)}
           />
         )}
-        {step === 6 && (
+        {step === 5 && (
           <SingleSelect
             title="How many fragrances do you currently own?"
             helper="We'll use this to understand whether you're building a starter wardrobe or refining a collection."
@@ -200,7 +175,7 @@ export function Onboarding() {
             onChange={(v) => set('collectionSize', v)}
           />
         )}
-        {step === 7 && (
+        {step === 6 && (
           <div className="space-y-9 stagger">
             <SingleSelect
               title="What is your usual full-bottle budget?"
@@ -219,7 +194,7 @@ export function Onboarding() {
             />
           </div>
         )}
-        {step === 8 && (
+        {step === 7 && (
           <FragrancePicker
             title="Add fragrances you love"
             helper="Adding at least one fragrance will make your first recommendations much better."
@@ -231,7 +206,7 @@ export function Onboarding() {
             segKey="wouldBuyAgain"
           />
         )}
-        {step === 9 && (
+        {step === 8 && (
           <FragrancePicker
             title="Add fragrances that were not for you"
             helper="Even one bad fit helps Accord avoid poor recommendations."
@@ -243,20 +218,20 @@ export function Onboarding() {
             segKey="avoidSimilar"
           />
         )}
-        {step === 10 && (
+        {step === 9 && (
           <ReactionStep
             prefs={draft.directionPreferences ?? []}
             onChange={(v) => set('directionPreferences', v)}
           />
         )}
-        {step === 11 && (
+        {step === 10 && (
           <BoundariesStep
             directions={dependsPolarising}
             value={draft.conditionalPreferences ?? {}}
             onChange={(v) => set('conditionalPreferences', v)}
           />
         )}
-        {step === 12 && (
+        {step === 11 && (
           <MultiSelect
             title="What are you looking for right now?"
             helper="Choose as many as apply. You might be looking for several types of scents."
@@ -265,7 +240,7 @@ export function Onboarding() {
             onChange={(v) => set('currentGoals', v)}
           />
         )}
-        {step === 13 && (
+        {step === 12 && (
           <SingleSelect
             title="How loud do you like your fragrance?"
             helper="This helps Accord balance subtle, tasteful scents against stronger performers."
@@ -274,7 +249,7 @@ export function Onboarding() {
             onChange={(v) => set('projection', v)}
           />
         )}
-        {step === 14 && <Building />}
+        {step === 13 && <Building />}
       </div>
 
       <PrimaryButton onClick={next} disabled={!canContinue} className="w-full mt-8">
@@ -457,8 +432,11 @@ function LocationStep({
               <button
                 key={c}
                 onClick={() => pick(c)}
-                className="w-full text-left px-4 py-3 text-[14px] text-ink2 border-b border-line last:border-0 active:bg-white/[0.04]"
+                className="w-full text-left px-4 py-3 text-[14px] text-ink2 border-b border-line last:border-0 active:bg-white/[0.04] flex items-center gap-3"
               >
+                <span className="text-[18px] leading-none w-6 text-center shrink-0">
+                  {countryFlag(c)}
+                </span>
                 {c}
               </button>
             ))}
@@ -486,12 +464,20 @@ function LocationStep({
       </div>
 
       {value?.country && value.climateRegion !== 'unknown' && (
-        <div className="mt-5 flex flex-wrap gap-2 fade-up">
-          <Chip small tone="sage">
-            {value.climateRegion?.replace('_', ' ')}
-          </Chip>
-          <Chip small>{value.marketRegion}</Chip>
-          {value.currency && <Chip small>{value.currency}</Chip>}
+        <div className="mt-5 fade-up">
+          <div className="flex items-center gap-2 text-[14px] text-ink font-medium">
+            {countryFlag(value.country) && (
+              <span className="text-[18px] leading-none">{countryFlag(value.country)}</span>
+            )}
+            {value.city ? `${value.city}, ${value.country}` : value.country}
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Chip small tone="sage">
+              {value.climateRegion?.replace('_', ' ')}
+            </Chip>
+            <Chip small>{value.marketRegion}</Chip>
+            {value.currency && <Chip small>{value.currency}</Chip>}
+          </div>
         </div>
       )}
     </div>

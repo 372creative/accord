@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { useApp } from '../state/app';
-import { CollectionStatus } from '../types';
+import { CollectionStatus, Fragrance, RetailerRegion } from '../types';
 import { findById } from '../data/fragrances';
 import { Bottle } from '../components/Bottle';
 import { Chip, HeaderBackdrop, SectionLabel } from '../components/ui';
 import { UserMenu } from '../components/UserMenu';
 import { ChevronRightIcon, PlusIcon } from '../components/icons';
 import { AddFragranceSheet } from '../components/AddFragranceSheet';
+import { hasFullBottleAvailable, hasSampleAvailable } from '../lib/availability';
 
 const SEGMENTS: { id: CollectionStatus; label: string }[] = [
   { id: 'own', label: 'Own' },
@@ -34,8 +35,15 @@ const EMPTY_STATES: Record<CollectionStatus, { copy: string; cta: string }> = {
   },
 };
 
+function availabilityStatus(f: Fragrance, marketRegion?: RetailerRegion): string {
+  if (hasSampleAvailable(f, marketRegion)) return '· Sample available';
+  if (hasFullBottleAvailable(f, marketRegion)) return '· Full bottle available';
+  return '· No regional options yet';
+}
+
 export function Collection() {
-  const { collection, push } = useApp();
+  const { collection, push, answers } = useApp();
+  const marketRegion = answers.location?.marketRegion as RetailerRegion | undefined;
   const [segment, setSegment] = useState<CollectionStatus>('own');
   const [adding, setAdding] = useState(false);
 
@@ -118,6 +126,9 @@ export function Collection() {
                       <Chip small tone={negative(item.decisionTag) ? 'warn' : 'sage'}>
                         {item.decisionTag}
                       </Chip>
+                    )}
+                    {segment === 'wishlist' && f && (
+                      <span className="text-[11px] text-mute">{availabilityStatus(f, marketRegion)}</span>
                     )}
                   </div>
                 </div>
