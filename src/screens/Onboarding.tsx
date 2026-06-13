@@ -29,7 +29,16 @@ import { COUNTRIES, inferLocation } from '../data/geo';
 import { findById, FRAGRANCES } from '../data/fragrances';
 import { Bottle } from '../components/Bottle';
 import { Chip, ChipGroup, HeaderBackdrop, PrimaryButton, SectionLabel } from '../components/ui';
-import { ChevronLeftIcon, PlusIcon, SearchIcon, SparkleIcon, XIcon } from '../components/icons';
+import {
+  ChevronLeftIcon,
+  MarsIcon,
+  PlusIcon,
+  SearchIcon,
+  SparkleIcon,
+  UnisexIcon,
+  VenusIcon,
+  XIcon,
+} from '../components/icons';
 
 const TOTAL_STEPS = 14;
 const BOUNDARIES_STEP = 11;
@@ -135,6 +144,7 @@ export function Onboarding() {
             options={GENDERS.map((g) => g.label)}
             value={GENDERS.find((g) => g.id === draft.gender)?.label}
             onChange={(v) => set('gender', GENDERS.find((g) => g.label === v)!.id)}
+            icons={{ Man: <MarsIcon size={18} />, Woman: <VenusIcon size={18} /> }}
           />
         )}
         {step === 2 && (
@@ -149,6 +159,13 @@ export function Onboarding() {
                 ORIENTATIONS.find((o) => o.label === v)!.id as OnboardingAnswers['fragranceOrientation']
               )
             }
+            icons={{
+              'Masculine-leaning': <MarsIcon size={18} />,
+              'Feminine-leaning': <VenusIcon size={18} />,
+              Unisex: <UnisexIcon size={18} />,
+              'No preference': <SparkleIcon size={17} />,
+              "I'll decide per fragrance": <SparkleIcon size={17} />,
+            }}
           />
         )}
         {step === 3 && (
@@ -307,6 +324,7 @@ function SingleSelect({
   value,
   onChange,
   compact,
+  icons,
 }: {
   title: string;
   helper?: string;
@@ -314,6 +332,8 @@ function SingleSelect({
   value?: string;
   onChange: (v: string) => void;
   compact?: boolean;
+  /** Optional leading icon avatar per option label. */
+  icons?: Record<string, React.ReactNode>;
 }) {
   return (
     <div className="stagger">
@@ -324,18 +344,30 @@ function SingleSelect({
       <div className={`${compact ? 'mt-4' : 'mt-6'} space-y-2.5 stagger`}>
         {options.map((o) => {
           const active = value === o;
+          const icon = icons?.[o];
           return (
             <button
               key={o}
               onClick={() => onChange(o)}
-              className={`w-full text-left rounded-[14px] px-5 border transition active:scale-[0.99] font-medium text-[15px] ${
-                compact ? 'py-3.5' : 'py-4'
-              } ${
+              className={`w-full text-left rounded-[14px] border transition active:scale-[0.99] font-medium text-[15px] flex items-center gap-3.5 ${
+                icon ? 'pl-3 pr-5' : 'px-5'
+              } ${compact ? 'py-3.5' : 'py-4'} ${
                 active
                   ? 'bg-accent2/70 border-white/[0.16] text-accent-ink'
                   : 'bg-card border-white/[0.07] text-ink2'
               }`}
             >
+              {icon && (
+                <span
+                  className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 border ${
+                    active
+                      ? 'bg-white/[0.12] border-white/[0.18] text-accent-ink'
+                      : 'bg-white/[0.05] border-white/[0.08] text-sage/80'
+                  }`}
+                >
+                  {icon}
+                </span>
+              )}
               {o}
             </button>
           );

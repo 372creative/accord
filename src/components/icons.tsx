@@ -105,6 +105,27 @@ export const LogoutIcon = ({ size, ...p }: P) => (
   </svg>
 );
 
+export const MarsIcon = ({ size, ...p }: P) => (
+  <svg {...base(size)} {...p}>
+    <circle cx="10" cy="14" r="6" />
+    <path d="M14.5 9.5L20 4M20 4h-5M20 4v5" />
+  </svg>
+);
+
+export const VenusIcon = ({ size, ...p }: P) => (
+  <svg {...base(size)} {...p}>
+    <circle cx="12" cy="9" r="6" />
+    <path d="M12 15v6M9 18h6" />
+  </svg>
+);
+
+export const UnisexIcon = ({ size, ...p }: P) => (
+  <svg {...base(size)} {...p}>
+    <circle cx="12" cy="12" r="5" />
+    <path d="M12 17v5M9.5 20h5M15.5 8.5L20 4M20 4h-4M20 4v4" />
+  </svg>
+);
+
 export const DotsIcon = ({ size, ...p }: P) => (
   <svg {...base(size)} {...p}>
     <circle cx="12" cy="5" r="1" fill="currentColor" />
