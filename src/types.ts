@@ -35,6 +35,26 @@ export interface Fragrance {
   imageFileName?: string;
   /** Resolved image path under /public/fragrances; falls back to the SVG bottle if missing. */
   image?: string;
+  /** Future retailer/wholesaler readiness — not user-facing terminology. */
+  availability?: {
+    marketRegions?: string[];
+    retailers?: {
+      name: string;
+      region: string;
+      country?: string;
+      url?: string;
+      priceFrom?: number;
+      currency?: string;
+      sampleAvailable?: boolean;
+    }[];
+    wholesalers?: {
+      name: string;
+      region: string;
+      country?: string;
+      available?: boolean;
+      notes?: string;
+    }[];
+  };
   // ---- derived fields (computed at conversion time) ----
   /** The app's 18-direction taste taxonomy, derived from accords/styles/notes. */
   directions: string[];
@@ -52,6 +72,7 @@ export type CollectionStatus = 'own' | 'sampled' | 'wishlist' | 'sold';
 
 export interface CollectionItem {
   id: string;
+  /** References a dataset fragrance, or a synthetic `manual-…` id for free entries. */
   fragranceId: string;
   status: CollectionStatus;
   rating?: number;
@@ -60,9 +81,40 @@ export interface CollectionItem {
   dislikedChips: string[];
   personalNote?: string;
   lastUpdated: string;
+  /** Present only for fragrances not in the dataset (manual add). */
+  manual?: { name: string; brand: string; concentration?: string };
 }
 
 export type YesMaybeNo = 'yes' | 'maybe' | 'no';
+
+export type Gender = 'man' | 'woman';
+
+export type FragranceOrientation =
+  | 'masculine'
+  | 'feminine'
+  | 'unisex'
+  | 'no_preference'
+  | 'per_fragrance';
+
+export type AgeRange = 'under_18' | '18_24' | '25_34' | '35_44' | '45_54' | '55_plus';
+
+export type ClimateRegion =
+  | 'cold_temperate'
+  | 'mild_temperate'
+  | 'mediterranean'
+  | 'tropical_humid'
+  | 'hot_dry'
+  | 'unknown';
+
+export type MarketRegion = 'EU' | 'UK' | 'US' | 'SEA' | 'MENA' | 'OTHER';
+
+export interface UserLocation {
+  country: string;
+  city?: string;
+  climateRegion?: ClimateRegion;
+  currency?: string;
+  marketRegion?: MarketRegion;
+}
 
 export interface PickedFragrance {
   fragranceId?: string;
@@ -89,6 +141,10 @@ export interface ConditionalPreference {
 }
 
 export interface OnboardingAnswers {
+  gender?: Gender;
+  fragranceOrientation?: FragranceOrientation;
+  ageRange?: AgeRange;
+  location?: UserLocation;
   experienceLevel?: string;
   collectionSize?: string;
   budgetRange?: string;

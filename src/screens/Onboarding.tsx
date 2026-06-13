@@ -9,6 +9,7 @@ import {
   YesMaybeNo,
 } from '../types';
 import {
+  AGE_RANGES,
   BUDGET_RANGES,
   CLONE_OPENNESS,
   COLLECTION_SIZES,
@@ -16,19 +17,22 @@ import {
   DIRECTIONS,
   DISLIKE_CHIPS,
   EXPERIENCE_LEVELS,
+  GENDERS,
   GOALS,
   LOVE_CHIPS,
+  ORIENTATIONS,
   POLARISING_DIRECTIONS,
   PROJECTION_LEVELS,
   REACTIONS,
 } from '../data/options';
+import { COUNTRIES, inferLocation } from '../data/geo';
 import { findById, FRAGRANCES } from '../data/fragrances';
 import { Bottle } from '../components/Bottle';
 import { Chip, ChipGroup, HeaderBackdrop, PrimaryButton, SectionLabel } from '../components/ui';
 import { ChevronLeftIcon, PlusIcon, SearchIcon, SparkleIcon, XIcon } from '../components/icons';
 
-const TOTAL_STEPS = 10;
-const BOUNDARIES_STEP = 7;
+const TOTAL_STEPS = 14;
+const BOUNDARIES_STEP = 11;
 
 export function Onboarding() {
   const { answers, completeOnboarding } = useApp();
@@ -70,25 +74,33 @@ export function Onboarding() {
   const canContinue = (() => {
     switch (step) {
       case 1:
-        return !!draft.experienceLevel;
+        return !!draft.gender;
       case 2:
-        return !!draft.collectionSize;
+        return !!draft.fragranceOrientation;
       case 3:
-        return !!draft.budgetRange && !!draft.openToClones;
+        return !!draft.ageRange;
       case 4:
-        return draft.favourites.length > 0;
+        return !!draft.location?.country;
       case 5:
-        return draft.dislikes.length > 0;
+        return !!draft.experienceLevel;
+      case 6:
+        return !!draft.collectionSize;
+      case 7:
+        return !!draft.budgetRange && !!draft.openToClones;
       case 8:
-        return draft.currentGoals.length > 0;
+        return draft.favourites.length > 0;
       case 9:
+        return draft.dislikes.length > 0;
+      case 12:
+        return draft.currentGoals.length > 0;
+      case 13:
         return !!draft.projection;
       default:
         return true;
     }
   })();
 
-  const skippable = step === 4 || step === 5;
+  const skippable = step === 8 || step === 9;
 
   return (
     <div className="min-h-dvh flex flex-col px-6 pb-8">
@@ -119,6 +131,42 @@ export function Onboarding() {
       <div key={step} className="flex-1 flex flex-col pt-9">
         {step === 1 && (
           <SingleSelect
+            title="What is your gender?"
+            options={GENDERS.map((g) => g.label)}
+            value={GENDERS.find((g) => g.id === draft.gender)?.label}
+            onChange={(v) => set('gender', GENDERS.find((g) => g.label === v)!.id)}
+          />
+        )}
+        {step === 2 && (
+          <SingleSelect
+            title="How should Accord frame recommendations for you?"
+            helper="This helps us tune the balance between masculine, feminine and unisex recommendations."
+            options={ORIENTATIONS.map((o) => o.label)}
+            value={ORIENTATIONS.find((o) => o.id === draft.fragranceOrientation)?.label}
+            onChange={(v) =>
+              set(
+                'fragranceOrientation',
+                ORIENTATIONS.find((o) => o.label === v)!.id as OnboardingAnswers['fragranceOrientation']
+              )
+            }
+          />
+        )}
+        {step === 3 && (
+          <SingleSelect
+            title="What age range are you in?"
+            helper="This helps Accord tune recommendation tone — from beginner-friendly fresh scents to more mature classics."
+            options={AGE_RANGES.map((a) => a.label)}
+            value={AGE_RANGES.find((a) => a.id === draft.ageRange)?.label}
+            onChange={(v) =>
+              set('ageRange', AGE_RANGES.find((a) => a.label === v)!.id as OnboardingAnswers['ageRange'])
+            }
+          />
+        )}
+        {step === 4 && (
+          <LocationStep value={draft.location} onChange={(v) => set('location', v)} />
+        )}
+        {step === 5 && (
+          <SingleSelect
             title="How deep are you into fragrances?"
             helper="This helps Accord decide how specific or beginner-friendly your recommendations should be."
             options={EXPERIENCE_LEVELS}
@@ -126,7 +174,7 @@ export function Onboarding() {
             onChange={(v) => set('experienceLevel', v)}
           />
         )}
-        {step === 2 && (
+        {step === 6 && (
           <SingleSelect
             title="How many fragrances do you currently own?"
             helper="We'll use this to understand whether you're building a starter wardrobe or refining a collection."
@@ -135,7 +183,7 @@ export function Onboarding() {
             onChange={(v) => set('collectionSize', v)}
           />
         )}
-        {step === 3 && (
+        {step === 7 && (
           <div className="space-y-9 stagger">
             <SingleSelect
               title="What is your usual full-bottle budget?"
@@ -154,7 +202,7 @@ export function Onboarding() {
             />
           </div>
         )}
-        {step === 4 && (
+        {step === 8 && (
           <FragrancePicker
             title="Add fragrances you love"
             helper="Adding at least one fragrance will make your first recommendations much better."
@@ -166,7 +214,7 @@ export function Onboarding() {
             segKey="wouldBuyAgain"
           />
         )}
-        {step === 5 && (
+        {step === 9 && (
           <FragrancePicker
             title="Add fragrances that were not for you"
             helper="Even one bad fit helps Accord avoid poor recommendations."
@@ -178,20 +226,20 @@ export function Onboarding() {
             segKey="avoidSimilar"
           />
         )}
-        {step === 6 && (
+        {step === 10 && (
           <ReactionStep
             prefs={draft.directionPreferences ?? []}
             onChange={(v) => set('directionPreferences', v)}
           />
         )}
-        {step === 7 && (
+        {step === 11 && (
           <BoundariesStep
             directions={dependsPolarising}
             value={draft.conditionalPreferences ?? {}}
             onChange={(v) => set('conditionalPreferences', v)}
           />
         )}
-        {step === 8 && (
+        {step === 12 && (
           <MultiSelect
             title="What are you looking for right now?"
             helper="Choose as many as apply. You might be looking for several types of scents."
@@ -200,7 +248,7 @@ export function Onboarding() {
             onChange={(v) => set('currentGoals', v)}
           />
         )}
-        {step === 9 && (
+        {step === 13 && (
           <SingleSelect
             title="How loud do you like your fragrance?"
             helper="This helps Accord balance subtle, tasteful scents against stronger performers."
@@ -209,7 +257,7 @@ export function Onboarding() {
             onChange={(v) => set('projection', v)}
           />
         )}
-        {step === 10 && <Building />}
+        {step === 14 && <Building />}
       </div>
 
       <PrimaryButton onClick={next} disabled={!canContinue} className="w-full mt-8">
@@ -319,6 +367,101 @@ function MultiSelect({
       <div className="mt-7">
         <ChipGroup options={options} selected={selected} onToggle={toggle} />
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Location (country + optional city, with inferred context)
+// ---------------------------------------------------------------------------
+
+function LocationStep({
+  value,
+  onChange,
+}: {
+  value?: OnboardingAnswers['location'];
+  onChange: (v: OnboardingAnswers['location']) => void;
+}) {
+  const [query, setQuery] = useState(value?.country ?? '');
+  const matches = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q || q === value?.country?.toLowerCase()) return [];
+    return COUNTRIES.filter((c) => c.toLowerCase().includes(q)).slice(0, 6);
+  }, [query, value?.country]);
+
+  const pick = (country: string) => {
+    setQuery(country);
+    onChange(inferLocation(country, value?.city));
+  };
+  const setCity = (city: string) => {
+    if (value?.country) onChange(inferLocation(value.country, city));
+  };
+  const useFreeText = query.trim().length > 2 && matches.length === 0 && !value?.country;
+
+  return (
+    <div className="stagger">
+      <h2 className="font-display font-medium text-[26px] leading-snug text-ink">
+        Where are you based?
+      </h2>
+      <p className="mt-3 text-[14px] text-mute leading-relaxed">
+        We use this for climate, seasonality, pricing and future retailer availability.
+      </p>
+
+      <div className="mt-6">
+        <SectionLabel className="mb-2">Country</SectionLabel>
+        <input
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            if (value?.country && e.target.value !== value.country)
+              onChange(undefined as unknown as OnboardingAnswers['location']);
+          }}
+          placeholder="Start typing your country…"
+          className="w-full rounded-[14px] bg-card border border-white/[0.08] px-4 py-3.5 text-[15px] text-ink placeholder:text-mute outline-none focus:border-accent2/60"
+        />
+        {matches.length > 0 && (
+          <div className="mt-2 rounded-[14px] bg-card2 border border-white/[0.08] overflow-hidden">
+            {matches.map((c) => (
+              <button
+                key={c}
+                onClick={() => pick(c)}
+                className="w-full text-left px-4 py-3 text-[14px] text-ink2 border-b border-line last:border-0 active:bg-white/[0.04]"
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+        )}
+        {useFreeText && (
+          <button
+            onClick={() => pick(query.trim())}
+            className="mt-2 w-full text-left rounded-[14px] bg-card2 border border-white/[0.08] px-4 py-3 text-[14px] text-ink2 active:bg-white/[0.04]"
+          >
+            Use “<span className="text-ink">{query.trim()}</span>”
+          </button>
+        )}
+      </div>
+
+      <div className="mt-5">
+        <SectionLabel className="mb-2">City (optional)</SectionLabel>
+        <input
+          value={value?.city ?? ''}
+          onChange={(e) => setCity(e.target.value)}
+          placeholder="e.g. Tallinn"
+          disabled={!value?.country}
+          className="w-full rounded-[14px] bg-card border border-white/[0.08] px-4 py-3.5 text-[15px] text-ink placeholder:text-mute outline-none focus:border-accent2/60 disabled:opacity-40"
+        />
+      </div>
+
+      {value?.country && value.climateRegion !== 'unknown' && (
+        <div className="mt-5 flex flex-wrap gap-2 fade-up">
+          <Chip small tone="sage">
+            {value.climateRegion?.replace('_', ' ')}
+          </Chip>
+          <Chip small>{value.marketRegion}</Chip>
+          {value.currency && <Chip small>{value.currency}</Chip>}
+        </div>
+      )}
     </div>
   );
 }

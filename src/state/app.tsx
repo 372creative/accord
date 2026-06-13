@@ -39,8 +39,19 @@ interface AppState {
   itemFor: (fragranceId: string) => CollectionItem | undefined;
   setStatus: (fragranceId: string, status: CollectionStatus | null) => void;
   updateItem: (fragranceId: string, patch: Partial<CollectionItem>) => void;
+  addCollectionItem: (input: NewCollectionInput) => void;
   feedback: FeedbackMap;
   giveFeedback: (fragranceId: string, value: string) => void;
+}
+
+export interface NewCollectionInput {
+  /** Dataset id, or omitted for a manual entry. */
+  fragranceId?: string;
+  status: CollectionStatus;
+  rating?: number;
+  decisionTag?: string;
+  personalNote?: string;
+  manual?: { name: string; brand: string; concentration?: string };
 }
 
 const Ctx = createContext<AppState | null>(null);
@@ -240,6 +251,43 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     );
   }, []);
 
+  const addCollectionItem = useCallback((input: NewCollectionInput) => {
+    const fragranceId = input.fragranceId ?? `manual-${Date.now()}-${idCounter++}`;
+    setCollection((items) => {
+      const base: CollectionItem = {
+        id: newId(),
+        fragranceId,
+        status: input.status,
+        rating: input.rating,
+        decisionTag: input.decisionTag,
+        personalNote: input.personalNote,
+        manual: input.manual,
+        likedChips: [],
+        dislikedChips: [],
+        lastUpdated: new Date().toISOString(),
+      };
+      // adding a known fragrance that's already tracked just updates it in place
+      const existing = input.fragranceId
+        ? items.find((i) => i.fragranceId === input.fragranceId)
+        : undefined;
+      if (existing) {
+        return items.map((i) =>
+          i.id === existing.id
+            ? {
+                ...i,
+                status: input.status,
+                rating: input.rating ?? i.rating,
+                decisionTag: input.decisionTag ?? i.decisionTag,
+                personalNote: input.personalNote ?? i.personalNote,
+                lastUpdated: new Date().toISOString(),
+              }
+            : i
+        );
+      }
+      return [base, ...items];
+    });
+  }, []);
+
   const value: AppState = {
     stage,
     setStage,
@@ -258,6 +306,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     itemFor,
     setStatus,
     updateItem,
+    addCollectionItem,
     feedback,
     giveFeedback,
   };

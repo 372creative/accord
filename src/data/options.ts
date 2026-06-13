@@ -1,3 +1,25 @@
+export const GENDERS: { id: 'man' | 'woman'; label: string }[] = [
+  { id: 'man', label: 'Man' },
+  { id: 'woman', label: 'Woman' },
+];
+
+export const ORIENTATIONS: { id: string; label: string }[] = [
+  { id: 'masculine', label: 'Masculine-leaning' },
+  { id: 'feminine', label: 'Feminine-leaning' },
+  { id: 'unisex', label: 'Unisex' },
+  { id: 'no_preference', label: 'No preference' },
+  { id: 'per_fragrance', label: "I'll decide per fragrance" },
+];
+
+export const AGE_RANGES: { id: string; label: string }[] = [
+  { id: 'under_18', label: 'Under 18' },
+  { id: '18_24', label: '18–24' },
+  { id: '25_34', label: '25–34' },
+  { id: '35_44', label: '35–44' },
+  { id: '45_54', label: '45–54' },
+  { id: '55_plus', label: '55+' },
+];
+
 export const EXPERIENCE_LEVELS = [
   'Just getting started',
   'I own a few',

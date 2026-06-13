@@ -10,12 +10,30 @@ import {
 } from '../components/ui';
 import { TraitBars } from '../components/TraitBars';
 import { UserMenu } from '../components/UserMenu';
+import { AGE_RANGES, GENDERS, ORIENTATIONS } from '../data/options';
+import { CLIMATE_LABELS } from '../data/geo';
 
 export function ProfileTab() {
   const { profile, answers, refineProfile } = useApp();
   if (!profile) return null;
 
+  const loc = answers.location;
   const prefRows: { label: string; value: string }[] = [
+    { label: 'Gender', value: GENDERS.find((g) => g.id === answers.gender)?.label ?? '—' },
+    {
+      label: 'Framing',
+      value: ORIENTATIONS.find((o) => o.id === answers.fragranceOrientation)?.label ?? '—',
+    },
+    { label: 'Age range', value: AGE_RANGES.find((a) => a.id === answers.ageRange)?.label ?? '—' },
+    {
+      label: 'Location',
+      value: loc?.country ? `${loc.city ? loc.city + ', ' : ''}${loc.country}` : '—',
+    },
+    { label: 'Climate', value: CLIMATE_LABELS[loc?.climateRegion ?? 'unknown'] },
+    {
+      label: 'Market',
+      value: loc?.marketRegion ? `${loc.marketRegion}${loc.currency ? ` · ${loc.currency}` : ''}` : '—',
+    },
     { label: 'Budget', value: answers.budgetRange ?? '—' },
     { label: 'Clones', value: answers.openToClones ?? '—' },
     { label: 'Projection', value: answers.projection ?? '—' },
@@ -154,7 +172,12 @@ export function ProfileTab() {
 
         <GlowCard>
           <div className="p-5">
-            <SectionLabel>Preferences</SectionLabel>
+            <div className="flex items-center justify-between">
+              <SectionLabel>Context</SectionLabel>
+              <button onClick={refineProfile} className="text-[12px] font-display font-medium text-sage">
+                Edit context
+              </button>
+            </div>
             <div className="mt-2">
               {prefRows.map((r) => (
                 <div key={r.label}>

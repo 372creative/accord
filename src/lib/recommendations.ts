@@ -13,6 +13,7 @@ import {
   SignalWeights,
   sweetIsConditional,
 } from '../logic/profile';
+import { currentSeason, Season } from '../data/geo';
 
 const BUDGET_ORDER: Record<string, number> = {
   'Under €30': 0,
@@ -211,6 +212,13 @@ interface ScoreContext {
   prefWords: Set<string>;
   /** Does the user positively rate fresh/blue territory at all? */
   likesFresh: boolean;
+  // soft context signals
+  climate: string;
+  country?: string;
+  season: Season;
+  orientation?: string;
+  matureLeaning: boolean;
+  youngLeaning: boolean;
 }
 
 export function buildScoreContext(
@@ -267,7 +275,15 @@ export function buildScoreContext(
   const likesFresh =
     fr === 'love' || fr === 'enjoy' || (weights.like['Fresh / aquatic'] ?? 0) >= 2;
 
+  const age = answers.ageRange;
+
   return {
+    climate: answers.location?.climateRegion ?? 'unknown',
+    country: answers.location?.country,
+    season: currentSeason(answers.location?.country),
+    orientation: answers.fragranceOrientation,
+    matureLeaning: age === '35_44' || age === '45_54' || age === '55_plus',
+    youngLeaning: age === 'under_18' || age === '18_24',
     answers,
     weights,
     collection,
@@ -469,6 +485,87 @@ export function scoreFragrance(f: Fragrance, ctx: ScoreContext): Recommendation 
     signals.push('Your goal: cheap hidden gems');
   }
   if (answers.currentGoals.includes('Cold weather scent') && f.darknessLevel >= 5) score += 2;
+
+  // ---- Soft context: orientation, age, season, climate ------------------------
+  const styleHas = (re: RegExp) => f.styleTags.some((t) => re.test(t));
+
+  if (ctx.orientation === 'masculine' && styleHas(/masculine|gentlemanly/i)) score += 1.5;
+  if ((ctx.orientation === 'unisex' || ctx.orientation === 'feminine') && styleHas(/unisex/i)) {
+    score += 3;
+    signals.push('Unisex profile fits your framing');
+  }
+
+  const lovesSweet =
+    weights.reactions['Sweet'] === 'love' || weights.reactions['Sweet'] === 'enjoy';
+  if (ctx.matureLeaning) {
+    if (styleHas(/classic|refined|elegant|mature|sophisticated|formal|gentlemanly/i)) score += 2;
+    if (styleHas(/club|youthful|very sweet/i) && !lovesSweet) {
+      score -= 3;
+      cautions.push('leans young and loud — may read less refined than your usual style');
+    }
+  }
+  if (ctx.youngLeaning && styleHas(/easy|versatile|fresh|daily/i)) score += 1.5;
+
+  // current season vs the fragrance's season tags
+  const inSeason = f.seasonTags.includes(ctx.season);
+  if (inSeason) {
+    score += 4;
+    signals.push(
+      ctx.country ? `In season in ${ctx.country} right now` : `In season right now (${ctx.season.toLowerCase()})`
+    );
+  } else if (
+    f.seasonTags.length > 0 &&
+    !answers.currentGoals.includes('Summer freshie') &&
+    !answers.currentGoals.includes('Holiday / beach')
+  ) {
+    score -= 3;
+    cautions.push(
+      `better for ${f.seasonTags.slice(0, 2).join('/').toLowerCase()} than ${ctx.season.toLowerCase()}${
+        ctx.country ? ` in ${ctx.country}` : ''
+      }`
+    );
+  }
+
+  // climate
+  const heavy = f.sweetnessLevel >= 6 || f.darknessLevel >= 5 || f.directions.includes('Oud');
+  const freshLight = f.freshnessLevel >= 6 && f.sweetnessLevel <= 4;
+  switch (ctx.climate) {
+    case 'cold_temperate':
+    case 'mild_temperate':
+      if ((ctx.season === 'Winter' || ctx.season === 'Autumn') && f.darknessLevel >= 4) {
+        score += 3;
+        signals.push(`Good fit for cooler weather${ctx.country ? ` in ${ctx.country}` : ''}`);
+      }
+      break;
+    case 'mediterranean':
+      if (
+        f.directions.some((d) => ['Citrus', 'Green', 'Vetiver', 'Salty', 'Mineral'].includes(d)) &&
+        f.sweetnessLevel <= 5
+      ) {
+        score += 3;
+        signals.push('Fresh enough for Mediterranean weather, with structure');
+      }
+      if (heavy && ctx.season === 'Summer') score -= 3;
+      break;
+    case 'tropical_humid':
+      if (freshLight) {
+        score += 4;
+        signals.push('Good fit for hot, humid weather');
+      }
+      if (heavy) {
+        score -= 6;
+        cautions.push('may feel dense or sweet in tropical humidity — sample first in heat');
+      }
+      break;
+    case 'hot_dry':
+      if (f.freshnessLevel >= 5 && f.sweetnessLevel <= 5) score += 3;
+      if (f.sweetnessLevel >= 7) {
+        score -= 4;
+        cautions.push('syrupy sweetness can turn cloying in daytime heat');
+      }
+      if (f.projectionLevel >= 8) cautions.push('strong projection — use carefully in daytime heat');
+      break;
+  }
 
   // ---- Card feedback ----------------------------------------------------------
   if (ctx.feedback[f.id]) score -= 25;
@@ -823,6 +920,54 @@ export function buildBuckets(
         id: `goal-${goal}`,
         title,
         subtitle: 'Matched to a goal you selected',
+        layout: 'row',
+        recs,
+      });
+  }
+
+  // location-aware bucket — one, only when we know the climate
+  const climateBucket = ((): { title: string; filter: (f: Fragrance) => boolean } | null => {
+    switch (ctx.climate) {
+      case 'cold_temperate':
+      case 'mild_temperate':
+        return ctx.season === 'Winter' || ctx.season === 'Autumn'
+          ? {
+              title: 'Cooler-weather picks',
+              filter: (f) =>
+                f.darknessLevel >= 4 ||
+                f.seasonTags.includes('Winter') ||
+                f.seasonTags.includes('Autumn'),
+            }
+          : {
+              title: 'Fresh scents for short summers',
+              filter: (f) => f.freshnessLevel >= 6 && f.seasonTags.includes('Summer'),
+            };
+      case 'mediterranean':
+        return {
+          title: 'Made for Mediterranean weather',
+          filter: (f) => f.freshnessLevel >= 5 && f.sweetnessLevel <= 5,
+        };
+      case 'tropical_humid':
+        return {
+          title: 'Heat-friendly fresh scents',
+          filter: (f) => f.freshnessLevel >= 6 && f.sweetnessLevel <= 4,
+        };
+      case 'hot_dry':
+        return {
+          title: 'Built for dry heat',
+          filter: (f) => f.freshnessLevel >= 5 && f.sweetnessLevel <= 5,
+        };
+      default:
+        return null;
+    }
+  })();
+  if (climateBucket) {
+    const recs = take(scored.filter(({ f }) => climateBucket.filter(f)), 4, true);
+    if (recs.length)
+      buckets.push({
+        id: 'climate',
+        title: climateBucket.title,
+        subtitle: ctx.country ? `Tuned to ${ctx.country}` : 'Tuned to your climate',
         layout: 'row',
         recs,
       });

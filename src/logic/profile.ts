@@ -265,6 +265,9 @@ export function generateProfile(answers: OnboardingAnswers): TasteProfile {
   if (answers.budgetRange) strength += 3;
   if (answers.projection) strength += 3;
   if (answers.openToClones) strength += 2;
+  if (answers.location?.country) strength += 3;
+  if (answers.ageRange) strength += 2;
+  if (answers.fragranceOrientation) strength += 2;
   strength = Math.round(Math.min(strength, 94));
 
   // ---- Narrative summary -----------------------------------------------
@@ -309,7 +312,42 @@ export function generateProfile(answers: OnboardingAnswers): TasteProfile {
     }.`;
   }
 
-  const summary = [sentence1, sentence2, sentence3, sentence4].filter(Boolean).join(' ');
+  // location / climate context
+  const loc = answers.location;
+  let sentence5 = '';
+  if (loc?.country) {
+    switch (loc.climateRegion) {
+      case 'cold_temperate':
+      case 'mild_temperate':
+        sentence5 = `You're based in ${loc.country}, so Accord will balance fresh daily scents with colder-weather options like tobacco, woods and amber${
+          avoidsSweet(weights) ? ' — as long as they stay within your sweetness tolerance' : ''
+        }.`;
+        break;
+      case 'tropical_humid':
+        sentence5 = `You're in a hot, humid climate, so Accord will prioritise fresh, citrus, green, musky and lightweight woody scents, and warn you when something may feel too dense.`;
+        break;
+      case 'mediterranean':
+        sentence5 = `Your Mediterranean climate favours citrus, greens and structured freshness, with room for heavier scents on cooler evenings.`;
+        break;
+      case 'hot_dry':
+        sentence5 = `In dry heat, Accord will lean on fresh-spicy, citrus and dry woods, and flag syrupy sweetness for daytime wear.`;
+        break;
+    }
+  }
+
+  // soft framing mention — only when the user chose a leaning
+  const sentence6 =
+    answers.fragranceOrientation === 'masculine'
+      ? 'Your recommendations are framed masculine-leaning, but Accord will still include unisex options when they match your taste.'
+      : answers.fragranceOrientation === 'feminine'
+        ? 'Your recommendations are framed feminine-leaning, with unisex options included when they match your taste.'
+        : answers.fragranceOrientation === 'unisex'
+          ? 'Accord will favour unisex and balanced profiles in your recommendations.'
+          : '';
+
+  const summary = [sentence1, sentence2, sentence3, sentence4, sentence5, sentence6]
+    .filter(Boolean)
+    .join(' ');
 
   // ---- Trait values (0–10), driven directly by reactions ----------------
   const REACTION_TRAIT: Record<DirectionReaction, number> = {
