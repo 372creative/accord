@@ -230,6 +230,67 @@ export interface Recommendation {
   signals: string[];
 }
 
+// ---------------------------------------------------------------------------
+// Structured recommendation engine output
+// ---------------------------------------------------------------------------
+
+export type RecommendationBucket =
+  | 'recommended_for_you'
+  | 'worth_sampling'
+  | 'similar_to_favourites'
+  | 'based_on_would_buy_again'
+  | 'low_sweetness_picks'
+  | 'under_budget'
+  | 'cheaper_alternatives'
+  | 'niche_discoveries'
+  | 'seasonal_picks'
+  | 'good_for_climate'
+  | 'risky_but_interesting'
+  | 'good_stretch'
+  | 'probably_not_for_you'
+  | 'too_basic_for_you'
+  | 'redundant_with_collection';
+
+export type MatchLabel =
+  | 'Strong fit'
+  | 'Good fit'
+  | 'Good stretch'
+  | 'Risky but interesting'
+  | 'Probably not for you'
+  | 'Too basic for your profile'
+  | 'Redundant with your collection';
+
+export interface ScoreBreakdown {
+  directionPreferences: number;
+  conditionalPreferences: number;
+  favouriteSimilarity: number;
+  dislikedPenalty: number;
+  collectionSignals: number;
+  currentGoals: number;
+  climateSeason: number;
+  budget: number;
+  orientation: number;
+  ageExperience: number;
+  popularityNovelty: number;
+  performance: number;
+  redundancy: number;
+  penalties: number;
+}
+
+export interface RecommendationResult {
+  fragrance: Fragrance;
+  score: number; // 0–100
+  bucket: RecommendationBucket;
+  matchLabel: MatchLabel;
+  whyItFits: string;
+  caution?: string;
+  positiveSignals: string[];
+  cautionSignals: string[];
+  negativeSignals: string[];
+  scoreBreakdown: ScoreBreakdown;
+  debug?: { totalBeforeClamp: number; appliedRules: string[]; capsApplied: string[] };
+}
+
 /** Lightweight per-fragrance feedback from recommendation cards. */
 export type CardFeedback = 'Not for me' | 'Too sweet' | 'Too common' | 'Already tried' | 'Own it';
 

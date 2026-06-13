@@ -2,7 +2,13 @@ import React, { useState } from 'react';
 import { useApp } from '../state/app';
 import { byId } from '../data/fragrances';
 import { CURATED_LISTS } from '../data/lists';
-import { GOAL_FILTERS, listsForFragrance, matchFor, similarFragrances } from '../lib/recommendations';
+import {
+  GOAL_FILTERS,
+  listsForFragrance,
+  matchFor,
+  matchResultFor,
+  similarFragrances,
+} from '../lib/recommendations';
 import { DECISION_TAGS, DISLIKE_CHIPS, LOVE_CHIPS } from '../data/options';
 import { Bottle } from '../components/Bottle';
 import {
@@ -22,11 +28,12 @@ import { hasSampleAvailable } from '../lib/availability';
 import { RetailerRegion } from '../types';
 
 export function FragranceDetail({ id }: { id: string }) {
-  const { pop, push, answers, collection, itemFor, setStatus, updateItem } = useApp();
+  const { pop, push, answers, collection, feedback, itemFor, setStatus, updateItem } = useApp();
   const f = byId(id);
   const item = itemFor(id);
   const owned = item && (item.status === 'own' || item.status === 'sampled' || item.status === 'sold');
   const rec = matchFor(id, answers, collection);
+  const result = matchResultFor(id, answers, collection, feedback);
   const similar = similarFragrances(id);
   const relatedLists = listsForFragrance(id, CURATED_LISTS);
 
@@ -279,41 +286,75 @@ export function FragranceDetail({ id }: { id: string }) {
       </div>
 
       {/* why this match drawer */}
-      {whyOpen && (
+      {whyOpen && result && (
         <div className="fixed inset-0 z-50 mx-auto max-w-[430px] flex items-end">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setWhyOpen(false)} />
-          <div className="relative w-full rounded-t-[24px] bg-card2 border-t border-white/[0.1] p-6 pb-9 sheet-up">
+          <div className="relative w-full rounded-t-[24px] bg-card2 border-t border-white/[0.1] p-6 pb-9 sheet-up max-h-[88dvh] overflow-y-auto no-scrollbar">
             <div className="mx-auto w-10 h-1 rounded-full bg-white/[0.12] mb-5" />
-            <h3 className="font-display font-medium text-[19px] text-ink">Why {rec.match}%?</h3>
+            <div className="flex items-baseline justify-between">
+              <h3 className="font-display font-medium text-[19px] text-ink">Why {result.score}%?</h3>
+              <span className="text-[11px] uppercase tracking-[0.14em] text-sage font-display font-medium">
+                {result.matchLabel}
+              </span>
+            </div>
+
             <div className="mt-4 space-y-2.5">
-              {rec.signals.map((s) => (
+              {result.positiveSignals.map((s) => (
                 <p key={s} className="text-[13px] leading-relaxed text-ink2 flex gap-2">
                   <CheckIcon size={14} className="mt-0.5 shrink-0 text-sage" />
                   <span>{s}</span>
                 </p>
               ))}
-              {matchedGoals.map((g) => (
-                <p key={g} className="text-[13px] leading-relaxed text-ink2 flex gap-2">
-                  <CheckIcon size={14} className="mt-0.5 shrink-0 text-sage" />
-                  <span>Fits your {g.toLowerCase()} goal</span>
+              {result.cautionSignals.map((s) => (
+                <p key={s} className="text-[13px] leading-relaxed text-[#c8a48b] flex gap-2">
+                  <InfoIcon size={14} className="mt-0.5 shrink-0" />
+                  <span>{s}</span>
                 </p>
               ))}
-              {rec.signals.length === 0 && matchedGoals.length === 0 && (
-                <p className="text-[13px] leading-relaxed text-mute">
-                  No strong taste signals yet — this score is mostly a baseline. Rating more
-                  fragrances sharpens it.
-                </p>
-              )}
-              {rec.caution && (
-                <p className="text-[13px] leading-relaxed text-[#c8a48b] flex gap-2">
+              {result.negativeSignals.map((s) => (
+                <p key={s} className="text-[13px] leading-relaxed text-[#c8a48b] flex gap-2">
                   <InfoIcon size={14} className="mt-0.5 shrink-0" />
-                  <span>Caution: {rec.caution}</span>
+                  <span>{s}</span>
                 </p>
-              )}
+              ))}
+              {result.positiveSignals.length === 0 &&
+                result.cautionSignals.length === 0 &&
+                result.negativeSignals.length === 0 && (
+                  <p className="text-[13px] leading-relaxed text-mute">
+                    No strong taste signals yet — this score is mostly a baseline. Rating more
+                    fragrances sharpens it.
+                  </p>
+                )}
             </div>
+
+            {/* score breakdown */}
+            <SectionLabel className="mt-6 mb-3">Score breakdown</SectionLabel>
+            <div className="space-y-1.5">
+              {(Object.entries(result.scoreBreakdown) as [string, number][])
+                .filter(([, v]) => v !== 0)
+                .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
+                .map(([k, v]) => (
+                  <div key={k} className="flex items-center justify-between text-[12px]">
+                    <span className="text-mute capitalize">
+                      {k.replace(/([A-Z])/g, ' $1').toLowerCase()}
+                    </span>
+                    <span className={v > 0 ? 'text-sage font-medium' : 'text-[#c8a48b] font-medium'}>
+                      {v > 0 ? '+' : ''}
+                      {v}
+                    </span>
+                  </div>
+                ))}
+            </div>
+
+            {result.debug?.capsApplied && result.debug.capsApplied.length > 0 && (
+              <p className="mt-3 text-[11px] text-[#c8a48b] leading-relaxed">
+                Score capped: {result.debug.capsApplied.join('; ')}.
+              </p>
+            )}
+
             <p className="mt-5 text-[11px] text-mute leading-relaxed">
-              Match scores combine your reactions, boundaries, favourites, dislikes, goals, budget
-              and collection signals.
+              Match scores combine your reactions, boundaries, favourites, dislikes, goals, budget,
+              climate and collection signals. Retailer availability never affects the score.
             </p>
           </div>
         </div>

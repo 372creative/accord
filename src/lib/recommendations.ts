@@ -327,12 +327,146 @@ const SHORT_PHRASES: Record<string, string> = {
   Powdery: 'soft powder',
 };
 
-export function scoreFragrance(f: Fragrance, ctx: ScoreContext): Recommendation {
+// ---------------------------------------------------------------------------
+// Experience / popularity derivation (graceful — derived from existing data)
+// ---------------------------------------------------------------------------
+
+const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
+
+type ExperienceTier = 'beginner' | 'intermediate' | 'advanced';
+
+export function experienceTier(answers: OnboardingAnswers): ExperienceTier {
+  const e = answers.experienceLevel;
+  const size = answers.collectionSize;
+  if (e === 'Collector / fragrance head' || size === '40+') return 'advanced';
+  if (e === "I'm into it" || size === '6–15' || size === '16–40') return 'intermediate';
+  return 'beginner';
+}
+const isAdvancedUser = (a: OnboardingAnswers) => experienceTier(a) === 'advanced';
+const isBeginnerUser = (a: OnboardingAnswers) => experienceTier(a) === 'beginner';
+
+type PopTier =
+  | 'mainstream_icon'
+  | 'popular_designer'
+  | 'known_enthusiast'
+  | 'under_the_radar'
+  | 'obscure';
+
+export function popularityTierOf(f: Fragrance): PopTier {
+  const p = lc(f.popularity ?? '');
+  if (/mainstream|club pick|beginner classic|classic (masculine|fresh|aquatic)|clone icon|popular clone/.test(p))
+    return 'mainstream_icon';
+  if (/popular (modern )?designer|modern (popular|designer)|popular alternative|affordable (icon|popular)|popular cheapie|classic cheapie|popular designer niche/.test(p))
+    return 'popular_designer';
+  if (/enthusiast|niche mainstream|mainstream luxury|popular luxury/.test(p)) return 'known_enthusiast';
+  if (/niche (icon|classic)|popular niche|luxury icon/.test(p)) return 'under_the_radar';
+  if (/niche|indie|luxury/i.test(f.category) && f.uniquenessLevel >= 7) return 'under_the_radar';
+  if (f.uniquenessLevel >= 8) return 'obscure';
+  if (/affordable|designer/i.test(f.category)) return 'popular_designer';
+  return 'known_enthusiast';
+}
+
+function massAppealOf(f: Fragrance): number {
+  const base = { mainstream_icon: 9, popular_designer: 7, known_enthusiast: 5, under_the_radar: 3, obscure: 2 }[
+    popularityTierOf(f)
+  ];
+  return clamp(base + (5 - f.uniquenessLevel) * 0.4, 1, 10);
+}
+
+const isCloneFragrance = (f: Fragrance) => isAlternativeLeaning(f);
+
+/** A mainstream pick that's beneath an advanced user's profile. */
+export function isTooBasicForUser(
+  f: Fragrance,
+  answers: OnboardingAnswers,
+  _collection: CollectionItem[] = []
+): boolean {
+  if (!isAdvancedUser(answers)) return false;
+  const t = popularityTierOf(f);
+  return (
+    (t === 'mainstream_icon' || t === 'popular_designer') &&
+    (massAppealOf(f) >= 8 || f.uniquenessLevel <= 4)
+  );
+}
+
+/** Heavy overlap with something the user already owns/sampled. */
+export function detectRedundancy(
+  f: Fragrance,
+  collection: CollectionItem[],
+  _all: Fragrance[] = fragrances
+): { isRedundant: boolean; overlapWith: string[]; reason?: string } {
+  const owned = collection
+    .filter((c) => c.status === 'own' || c.status === 'sampled')
+    .map((c) => ({ frag: findById(c.fragranceId), tag: c.decisionTag }))
+    .filter((x): x is { frag: Fragrance; tag: string | undefined } => !!x.frag);
+  for (const { frag, tag } of owned) {
+    if (frag.id === f.id) continue;
+    const shared = sharedDirections(frag, f);
+    const linked = linkedToAnchor(f, frag);
+    const closeProfile =
+      Math.abs(frag.sweetnessLevel - f.sweetnessLevel) <= 2 &&
+      Math.abs(frag.freshnessLevel - f.freshnessLevel) <= 3;
+    if ((linked || shared.length >= 3) && (closeProfile || tag === 'Good, but redundant')) {
+      return {
+        isRedundant: true,
+        overlapWith: [frag.name],
+        reason: `Overlaps heavily with ${frag.name} in your collection`,
+      };
+    }
+  }
+  return { isRedundant: false, overlapWith: [] };
+}
+
+const SCORE_RANGES: Record<keyof import('../types').ScoreBreakdown, [number, number]> = {
+  directionPreferences: [-30, 30],
+  conditionalPreferences: [-25, 20],
+  favouriteSimilarity: [0, 20],
+  dislikedPenalty: [-30, 0],
+  collectionSignals: [-20, 20],
+  currentGoals: [0, 18],
+  climateSeason: [-10, 12],
+  budget: [-12, 8],
+  orientation: [-6, 6],
+  ageExperience: [-15, 12],
+  popularityNovelty: [-25, 15],
+  performance: [-8, 8],
+  redundancy: [-25, 0],
+  penalties: [-30, 0],
+};
+
+// ---------------------------------------------------------------------------
+// Core scorer — transparent, componentised, explainable
+// ---------------------------------------------------------------------------
+
+export function scoreFull(
+  f: Fragrance,
+  ctx: ScoreContext
+): import('../types').RecommendationResult {
   const { weights, answers } = ctx;
   const tokens = tokensOf(f);
-  let score = 58;
-  const signals: string[] = [];
+  const bd: import('../types').ScoreBreakdown = {
+    directionPreferences: 0,
+    conditionalPreferences: 0,
+    favouriteSimilarity: 0,
+    dislikedPenalty: 0,
+    collectionSignals: 0,
+    currentGoals: 0,
+    climateSeason: 0,
+    budget: 0,
+    orientation: 0,
+    ageExperience: 0,
+    popularityNovelty: 0,
+    performance: 0,
+    redundancy: 0,
+    penalties: 0,
+  };
+  const positiveSignals: string[] = [];
+  const cautionSignals: string[] = [];
+  const negativeSignals: string[] = [];
+  const appliedRules: string[] = [];
+  const capsApplied: string[] = [];
   const cautions: string[] = [];
+  const signals: string[] = [];
 
   // ---- Reaction-tiered direction matching --------------------------------
   const loveHits = f.directions.filter((d) => (weights.like[d] ?? 0) >= 3.5);
@@ -345,16 +479,25 @@ export function scoreFragrance(f: Fragrance, ctx: ScoreContext): Recommendation 
     (d) => (weights.avoid[d] ?? 0) >= 2 && (weights.avoid[d] ?? 0) < 3.5
   );
 
-  score += Math.min(loveHits.length * 8, 16);
-  score += Math.min(enjoyHits.length * 5, 10);
-  score -= avoidHits.length * 12;
-  score -= notForMeHits.length * 7;
-  if (loveHits.length) signals.push(`You love: ${loveHits.join(', ')}`);
-  if (enjoyHits.length) signals.push(`You enjoy: ${enjoyHits.join(', ')}`);
-  if (avoidHits.length)
+  bd.directionPreferences += loveHits.length * 11 + enjoyHits.length * 6;
+  bd.directionPreferences -= avoidHits.length * 15 + notForMeHits.length * 8;
+  if (loveHits.length) {
+    signals.push(`You love: ${loveHits.join(', ')}`);
+    positiveSignals.push(`Matches directions you love: ${loveHits.join(', ')}`);
+    appliedRules.push(`+${loveHits.length * 11} love-direction match (${loveHits.join(', ')})`);
+  }
+  if (enjoyHits.length) {
+    signals.push(`You enjoy: ${enjoyHits.join(', ')}`);
+    positiveSignals.push(`Matches directions you enjoy: ${enjoyHits.join(', ')}`);
+  }
+  if (avoidHits.length) {
     cautions.push(`leans ${joinNice(avoidHits.map(lc))}, which you avoid`);
-  else if (notForMeHits.length)
+    negativeSignals.push(`Leans ${joinNice(avoidHits.map(lc))} — directions you avoid`);
+    appliedRules.push(`-${avoidHits.length * 15} avoid-direction match`);
+  } else if (notForMeHits.length) {
     cautions.push(`leans ${joinNice(notForMeHits.map(lc))}, which is usually not for you`);
+    cautionSignals.push(`Leans ${joinNice(notForMeHits.map(lc))} — usually not for you`);
+  }
 
   // ---- Conditional ("Depends") nuance ------------------------------------
   let dependsWorks: { dir: string; chip: string } | null = null;
@@ -364,44 +507,54 @@ export function scoreFragrance(f: Fragrance, ctx: ScoreContext): Recommendation 
     if (!cp) continue;
     const notHit = cp.notForMe.find((chip) => chipMatches(chip, f, tokens));
     if (notHit) {
-      score -= 8;
+      bd.conditionalPreferences -= 12;
       if (!dependsFails) dependsFails = { dir, chip: notHit };
       continue;
     }
     const worksHit = cp.worksForMe.find((chip) => chipMatches(chip, f, tokens));
     if (worksHit) {
-      score += 5;
+      bd.conditionalPreferences += 8;
       if (!dependsWorks) dependsWorks = { dir, chip: worksHit };
     }
   }
-  if (dependsFails)
+  if (dependsFails) {
     cautions.unshift(
       `leans ${lc(dependsFails.chip).replace(/^too /, '')}, which you usually avoid — sample first`
     );
-  if (dependsWorks) signals.push(`Works for you: ${dependsWorks.chip}`);
+    cautionSignals.push(`${dependsFails.dir} here is ${lc(dependsFails.chip)} — which you usually avoid`);
+    appliedRules.push(`-12 conditional notForMe (${dependsFails.chip})`);
+  }
+  if (dependsWorks) {
+    signals.push(`Works for you: ${dependsWorks.chip}`);
+    positiveSignals.push(`${dependsWorks.dir} works for you when it's ${lc(dependsWorks.chip)}`);
+    appliedRules.push(`+8 conditional worksForMe (${dependsWorks.chip})`);
+  }
 
   // ---- Dataset recommend-if signals ---------------------------------------
   const signalHits = f.recommendSignals.filter((s) => ctx.prefWords.has(lc(s)));
-  if (signalHits.length >= 2) score += 4;
+  if (signalHits.length >= 2) bd.directionPreferences += 4;
 
-  // ---- Sweetness ------------------------------------------------------------
+  // ---- Sweetness (conditional / dislike axis) -------------------------------
   if (ctx.sweetAverse) {
     if (f.sweetnessLevel > 6) {
-      score -= (f.sweetnessLevel - 5) * 5;
+      bd.conditionalPreferences -= (f.sweetnessLevel - 5) * 5;
       cautions.push('noticeably sweeter than your comfort zone — sample before committing');
+      cautionSignals.push('Sweeter than your comfort zone');
     } else if (f.sweetnessLevel >= 5) {
-      score -= 4;
+      bd.conditionalPreferences -= 4;
       cautions.push('has a mild sweet streak');
     } else {
-      score += 5;
+      bd.conditionalPreferences += 5;
       signals.push('Low sweetness fits your profile');
+      positiveSignals.push('Low sweetness fits your profile');
     }
   } else if (ctx.sweetConditional && f.sweetnessLevel > 6 && !dependsWorks) {
-    score -= 5;
+    bd.conditionalPreferences -= 5;
     cautions.push('the sweetness may be higher than your usual tolerance — sample first');
+    cautionSignals.push('Sweetness may be above your usual tolerance');
   }
 
-  // ---- Anchors / anti-anchors ---------------------------------------------
+  // ---- Favourite similarity (anchors) -------------------------------------
   let bestAnchor: { name: string; shared: string[]; linked: boolean } | null = null;
   for (const a of ctx.anchors) {
     if (a.id === f.id) continue;
@@ -415,110 +568,182 @@ export function scoreFragrance(f: Fragrance, ctx: ScoreContext): Recommendation 
     }
   }
   if (bestAnchor) {
-    score += bestAnchor.linked ? 10 : 8;
+    bd.favouriteSimilarity += bestAnchor.linked ? 16 : 10 + Math.min(bestAnchor.shared.length * 2, 8);
     signals.push(`Close to ${bestAnchor.name}`);
+    positiveSignals.push(`Close to ${bestAnchor.name}, which you rated highly`);
+    appliedRules.push(`+favourite similarity (${bestAnchor.name})`);
   }
 
+  // ---- Disliked penalty (anti-anchors) ------------------------------------
   for (const anti of ctx.antiAnchors) {
     const close =
       linkedToAnchor(f, anti.fragrance) || sharedDirections(anti.fragrance, f).length >= 3;
     if (close) {
-      score -= anti.strong ? 16 : 12;
+      bd.dislikedPenalty -= anti.strong ? 18 : 12;
       cautions.push(`shares a lot of DNA with ${anti.fragrance.name}, which didn't work for you`);
-      if (anti.reasons.includes('Too sweet') && f.sweetnessLevel >= 6) score -= 4;
+      negativeSignals.push(`Shares DNA with ${anti.fragrance.name}, which you disliked`);
+      appliedRules.push(`-${anti.strong ? 18 : 12} disliked similarity (${anti.fragrance.name})`);
+      if (anti.reasons.includes('Too sweet') && f.sweetnessLevel >= 6) bd.dislikedPenalty -= 4;
       break;
     }
   }
 
   // ---- Mass-market blue handling (ranking trust) ---------------------------
   if (isMassBlue(f) && !ctx.likesFresh) {
-    score -= 7;
+    bd.popularityNovelty -= 7;
     cautions.push('a crowd favourite — may feel common, loud or synthetic');
+    cautionSignals.push('A crowd favourite — may feel common or synthetic');
   }
   if ((weights.avoid['__genericblue'] ?? 0) > 0 && f.styleTags.some((t) => /^blue/i.test(t)) && f.uniquenessLevel <= 5) {
-    score -= 8;
+    bd.dislikedPenalty -= 8;
     cautions.push('sits close to the generic "blue fresh" zone you avoid');
+    negativeSignals.push('Generic "blue fresh" zone you avoid');
   }
   if (
     (weights.avoid['__common'] ?? 0) >= 2 &&
     /mainstream|popular/i.test(f.popularity) &&
     f.uniquenessLevel <= 5
   ) {
-    score -= 6;
+    bd.dislikedPenalty -= 6;
     cautions.push('a very common scent — you tend to find these overhyped');
   }
 
-  // ---- Clones, budget, projection, goals -----------------------------------
-  if (ctx.cloneAverse && isAlternativeLeaning(f)) {
-    score -= 8;
+  // ---- Clones -----------------------------------------------------------------
+  if (ctx.cloneAverse && isCloneFragrance(f)) {
+    bd.penalties -= 8;
     cautions.push('an alternative-style composition — you prefer originals');
+    cautionSignals.push('An alternative/clone composition — you prefer originals');
   }
 
+  // ---- Budget -----------------------------------------------------------------
   const budgetTier = BUDGET_ORDER[answers.budgetRange ?? ''] ?? 2;
   const priceTier = PRICE_TIER[f.priceCategory];
-  if (priceTier <= budgetTier) score += 3;
+  if (priceTier <= budgetTier) bd.budget += 4;
   else if (priceTier - budgetTier >= 2) {
-    score -= 4;
-    cautions.push('well above your usual budget — try a decant first');
-  } else cautions.push('slightly above your usual budget');
-
-  if (answers.projection === 'Very subtle' && f.projectionLevel >= 8) {
-    score -= 5;
-    cautions.push('projects harder than you usually like');
+    bd.budget -= 10;
+    cautions.push('above your usual full-bottle budget — better as a sample first');
+    cautionSignals.push('Above your usual full-bottle budget — sample first');
+  } else {
+    bd.budget -= 4;
+    cautions.push('slightly above your usual budget');
   }
-  if (answers.projection === 'Beast mode') {
-    if (f.projectionLevel <= 4) cautions.push('wears close to the skin — quieter than your preference');
-    else if (f.projectionLevel >= 7) score += 2;
+
+  // ---- Performance ------------------------------------------------------------
+  if (answers.projection === 'Very subtle' && f.projectionLevel >= 8) {
+    bd.performance -= 6;
+    cautions.push('projects harder than you usually like');
+  } else if (answers.projection === 'Noticeable but tasteful' && f.projectionLevel >= 4 && f.projectionLevel <= 7) {
+    bd.performance += 3;
+  } else if (answers.projection === 'Strong projection' && f.projectionLevel >= 7) {
+    bd.performance += 3;
+  } else if (answers.projection === 'Beast mode') {
+    if (f.projectionLevel <= 4) {
+      bd.performance -= 4;
+      cautions.push('wears close to the skin — quieter than your preference');
+    } else if (f.projectionLevel >= 8) bd.performance += 4;
   }
   if (answers.favourites.some((x) => x.reasons.includes('Long-lasting')) && f.longevityLevel >= 7)
-    score += 3;
+    bd.performance += 3;
 
+  // ---- Current goals ----------------------------------------------------------
   if (answers.currentGoals.includes('Something unique') && f.uniquenessLevel >= 7) {
-    score += 4;
+    bd.currentGoals += 5;
     signals.push('Your goal: something unique');
+    positiveSignals.push('Fits your "something unique" goal');
   }
   if (
     answers.currentGoals.includes('Cheap hidden gems') &&
     (f.priceCategory === 'budget' || /middle eastern|affordable/i.test(f.category))
   ) {
-    score += 4;
+    bd.currentGoals += 5;
     signals.push('Your goal: cheap hidden gems');
+    positiveSignals.push('Fits your "cheap hidden gems" goal');
   }
-  if (answers.currentGoals.includes('Cold weather scent') && f.darknessLevel >= 5) score += 2;
+  if (answers.currentGoals.includes('Cold weather scent') && f.darknessLevel >= 5) bd.currentGoals += 3;
+  if (answers.currentGoals.includes('Niche discovery') && /niche|indie|luxury/i.test(f.category))
+    bd.currentGoals += 4;
 
-  // ---- Soft context: orientation, age, season, climate ------------------------
+  // ---- Orientation (soft) -----------------------------------------------------
   const styleHas = (re: RegExp) => f.styleTags.some((t) => re.test(t));
-
-  if (ctx.orientation === 'masculine' && styleHas(/masculine|gentlemanly/i)) score += 1.5;
+  if (ctx.orientation === 'masculine' && styleHas(/masculine|gentlemanly/i)) bd.orientation += 2;
   if ((ctx.orientation === 'unisex' || ctx.orientation === 'feminine') && styleHas(/unisex/i)) {
-    score += 3;
+    bd.orientation += 4;
     signals.push('Unisex profile fits your framing');
   }
 
+  // ---- Age / experience -------------------------------------------------------
   const lovesSweet =
     weights.reactions['Sweet'] === 'love' || weights.reactions['Sweet'] === 'enjoy';
   if (ctx.matureLeaning) {
-    if (styleHas(/classic|refined|elegant|mature|sophisticated|formal|gentlemanly/i)) score += 2;
+    if (styleHas(/classic|refined|elegant|mature|sophisticated|formal|gentlemanly/i)) bd.ageExperience += 2;
     if (styleHas(/club|youthful|very sweet/i) && !lovesSweet) {
-      score -= 3;
+      bd.ageExperience -= 3;
       cautions.push('leans young and loud — may read less refined than your usual style');
     }
   }
-  if (ctx.youngLeaning && styleHas(/easy|versatile|fresh|daily/i)) score += 1.5;
+  if (ctx.youngLeaning && styleHas(/easy|versatile|fresh|daily/i)) bd.ageExperience += 2;
+  if (isBeginnerUser(answers) && f.uniquenessLevel >= 8 && !answers.currentGoals.includes('Something unique')) {
+    bd.ageExperience -= 4;
+    cautionSignals.push('May be challenging while you are getting started');
+  }
 
-  // current season vs the fragrance's season tags
+  // ---- Popularity / novelty (experience-tiered) -------------------------------
+  const pop = popularityTierOf(f);
+  const tier = experienceTier(answers);
+  const wantsUnique =
+    answers.currentGoals.includes('Something unique') ||
+    answers.currentGoals.includes('Niche discovery');
+  const dislikesCommon =
+    (weights.avoid['__common'] ?? 0) >= 2 ||
+    answers.dislikes.some((d) => d.reasons.includes('Too common') || d.reasons.includes('Overhyped'));
+  if (tier === 'advanced') {
+    const popAdj = { mainstream_icon: -25, popular_designer: -15, known_enthusiast: 4, under_the_radar: 10, obscure: 8 }[pop];
+    bd.popularityNovelty += popAdj;
+    if (popAdj < 0) appliedRules.push(`${popAdj} popularity (${pop}, advanced user)`);
+    if (massAppealOf(f) >= 8 && f.uniquenessLevel <= 4) bd.popularityNovelty -= 6;
+    if (f.uniquenessLevel >= 7) bd.popularityNovelty += 6;
+    if (pop !== 'mainstream_icon' && pop !== 'popular_designer') positiveSignals.push('Under-the-radar pick for an advanced palate');
+  } else if (tier === 'beginner') {
+    const popAdj = { mainstream_icon: 6, popular_designer: 4, known_enthusiast: 2, under_the_radar: -2, obscure: -4 }[pop];
+    bd.popularityNovelty += wantsUnique && popAdj < 0 ? 0 : popAdj;
+  } else {
+    const popAdj = { mainstream_icon: -4, popular_designer: 0, known_enthusiast: 5, under_the_radar: 7, obscure: 2 }[pop];
+    bd.popularityNovelty += popAdj;
+  }
+
+  // ---- Too basic for advanced users -------------------------------------------
+  const tooBasic = isTooBasicForUser(f, answers, ctx.collection);
+  if (tooBasic) {
+    bd.ageExperience -= 12;
+    if (wantsUnique) bd.ageExperience -= 4;
+    if (dislikesCommon) bd.ageExperience -= 4;
+    negativeSignals.push('Too mainstream for your advanced profile');
+    appliedRules.push('Too basic for an advanced/collector profile');
+  }
+
+  // ---- Redundancy with collection ---------------------------------------------
+  const redundancy = detectRedundancy(f, ctx.collection);
+  if (redundancy.isRedundant) {
+    bd.redundancy -= 16;
+    cautions.push(`overlaps heavily with ${redundancy.overlapWith[0]} in your collection`);
+    cautionSignals.push(redundancy.reason ?? 'Overlaps with your collection');
+    appliedRules.push(`-16 redundant with ${redundancy.overlapWith[0]}`);
+  }
+
+  // ---- Season -----------------------------------------------------------------
   const inSeason = f.seasonTags.includes(ctx.season);
   if (inSeason) {
-    score += 4;
+    bd.climateSeason += 5;
     signals.push(
       ctx.country ? `In season in ${ctx.country} right now` : `In season right now (${ctx.season.toLowerCase()})`
     );
+    positiveSignals.push(`In season right now (${ctx.season.toLowerCase()})`);
   } else if (
     f.seasonTags.length > 0 &&
     !answers.currentGoals.includes('Summer freshie') &&
     !answers.currentGoals.includes('Holiday / beach')
   ) {
-    score -= 3;
+    bd.climateSeason -= 3;
     cautions.push(
       `better for ${f.seasonTags.slice(0, 2).join('/').toLowerCase()} than ${ctx.season.toLowerCase()}${
         ctx.country ? ` in ${ctx.country}` : ''
@@ -526,15 +751,16 @@ export function scoreFragrance(f: Fragrance, ctx: ScoreContext): Recommendation 
     );
   }
 
-  // climate
+  // ---- Climate ----------------------------------------------------------------
   const heavy = f.sweetnessLevel >= 6 || f.darknessLevel >= 5 || f.directions.includes('Oud');
   const freshLight = f.freshnessLevel >= 6 && f.sweetnessLevel <= 4;
   switch (ctx.climate) {
     case 'cold_temperate':
     case 'mild_temperate':
       if ((ctx.season === 'Winter' || ctx.season === 'Autumn') && f.darknessLevel >= 4) {
-        score += 3;
+        bd.climateSeason += 3;
         signals.push(`Good fit for cooler weather${ctx.country ? ` in ${ctx.country}` : ''}`);
+        positiveSignals.push(`Good fit for cooler weather${ctx.country ? ` in ${ctx.country}` : ''}`);
       }
       break;
     case 'mediterranean':
@@ -542,25 +768,27 @@ export function scoreFragrance(f: Fragrance, ctx: ScoreContext): Recommendation 
         f.directions.some((d) => ['Citrus', 'Green', 'Vetiver', 'Salty', 'Mineral'].includes(d)) &&
         f.sweetnessLevel <= 5
       ) {
-        score += 3;
+        bd.climateSeason += 3;
         signals.push('Fresh enough for Mediterranean weather, with structure');
       }
-      if (heavy && ctx.season === 'Summer') score -= 3;
+      if (heavy && ctx.season === 'Summer') bd.climateSeason -= 3;
       break;
     case 'tropical_humid':
       if (freshLight) {
-        score += 4;
+        bd.climateSeason += 4;
         signals.push('Good fit for hot, humid weather');
+        positiveSignals.push('Good fit for hot, humid weather');
       }
       if (heavy) {
-        score -= 6;
+        bd.climateSeason -= 6;
         cautions.push('may feel dense or sweet in tropical humidity — sample first in heat');
+        cautionSignals.push('May feel dense in humid weather');
       }
       break;
     case 'hot_dry':
-      if (f.freshnessLevel >= 5 && f.sweetnessLevel <= 5) score += 3;
+      if (f.freshnessLevel >= 5 && f.sweetnessLevel <= 5) bd.climateSeason += 3;
       if (f.sweetnessLevel >= 7) {
-        score -= 4;
+        bd.climateSeason -= 4;
         cautions.push('syrupy sweetness can turn cloying in daytime heat');
       }
       if (f.projectionLevel >= 8) cautions.push('strong projection — use carefully in daytime heat');
@@ -568,9 +796,63 @@ export function scoreFragrance(f: Fragrance, ctx: ScoreContext): Recommendation 
   }
 
   // ---- Card feedback ----------------------------------------------------------
-  if (ctx.feedback[f.id]) score -= 25;
+  if (ctx.feedback[f.id]) {
+    bd.penalties -= 25;
+    negativeSignals.push(`You marked this "${ctx.feedback[f.id]}"`);
+  }
 
-  const match = Math.round(Math.max(56, Math.min(97, score)));
+  // ---- Clamp each component to its allowed range, then total ------------------
+  (Object.keys(bd) as (keyof import('../types').ScoreBreakdown)[]).forEach((k) => {
+    const [min, max] = SCORE_RANGES[k];
+    bd[k] = Math.round(clamp(bd[k], min, max));
+  });
+  const totalBeforeClamp =
+    50 + (Object.values(bd) as number[]).reduce((a, b) => a + b, 0);
+  // Soft-compress the top end so genuinely-perfect storms don't all pin at 100 —
+  // keeps high scores meaningful and avoids bunching above 90.
+  let score = Math.max(0, totalBeforeClamp);
+  if (score > 86) score = 86 + (score - 86) * 0.45;
+  score = clamp(score, 0, 100);
+
+  // ---- Dealbreaker caps -------------------------------------------------------
+  const cap = (max: number, why: string) => {
+    if (score > max) {
+      score = max;
+      capsApplied.push(why);
+    }
+  };
+  const highSweetAvoid = ctx.sweetAverse && f.sweetnessLevel >= 8;
+  const noCloneClone = ctx.cloneAverse && isCloneFragrance(f);
+  const strongAvoidSimilar = ctx.antiAnchors.some(
+    (a) => a.strong && (linkedToAnchor(f, a.fragrance) || sharedDirections(a.fragrance, f).length >= 3)
+  );
+  if (avoidHits.length >= 2) cap(45, 'Matches multiple avoided directions');
+  else if (avoidHits.length === 1) cap(60, 'Matches an avoided direction');
+  if (tooBasic) cap(65, 'Too basic for your profile');
+  if (redundancy.isRedundant) cap(75, 'Redundant with your collection');
+  if (noCloneClone) cap(55, 'Clone — you prefer originals');
+  if (highSweetAvoid) cap(55, 'High sweetness — you avoid sweet');
+  if (strongAvoidSimilar) cap(50, 'Too close to a fragrance you want to avoid');
+  score = Math.round(score);
+
+  // ---- Match label & bucket ---------------------------------------------------
+  let matchLabel: import('../types').MatchLabel;
+  if (tooBasic) matchLabel = 'Too basic for your profile';
+  else if (redundancy.isRedundant && score >= 60) matchLabel = 'Redundant with your collection';
+  else if (score >= 90) matchLabel = 'Strong fit';
+  else if (score >= 75) matchLabel = 'Good fit';
+  else if (score >= 60) matchLabel = 'Good stretch';
+  else if (score >= 40) matchLabel = 'Risky but interesting';
+  else matchLabel = 'Probably not for you';
+
+  let bucket: import('../types').RecommendationBucket;
+  if (tooBasic) bucket = 'too_basic_for_you';
+  else if (redundancy.isRedundant) bucket = 'redundant_with_collection';
+  else if (score >= 75 && cautionSignals.length === 0) bucket = 'recommended_for_you';
+  else if (score >= 60 && cautionSignals.length <= 1) bucket = 'worth_sampling';
+  else if (score >= 50) bucket = 'good_stretch';
+  else if (score >= 40) bucket = 'risky_but_interesting';
+  else bucket = 'probably_not_for_you';
 
   // ---- Why it fits: nuanced, trust-building copy ------------------------------
   let why: string;
@@ -613,11 +895,46 @@ export function scoreFragrance(f: Fragrance, ctx: ScoreContext): Recommendation 
   const shortRaw = shortBits.slice(0, 2).join(' · ');
   const shortWhy = shortRaw ? shortRaw.charAt(0).toUpperCase() + shortRaw.slice(1) : undefined;
 
+  if (tooBasic)
+    why = `This is a strong mainstream reference, but probably too common for your current profile. ${f.description}`;
+
+  const capFirst = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
   const caution = cautions.length
-    ? `It ${cautions[0]}${cautions.length > 1 ? `; also ${cautions[1]}` : ''}.`
+    ? `${capFirst(cautions[0])}${cautions.length > 1 ? `; also ${cautions[1]}` : ''}.`
     : f.caution || undefined;
 
-  return { fragranceId: f.id, match, whyItFits: why, shortWhy, caution, signals: signals.slice(0, 4) };
+  // attach shortWhy onto positiveSignals consumer via closure store
+  legacyShortWhy.set(f.id + '|' + answers.experienceLevel, shortWhy);
+
+  return {
+    fragrance: f,
+    score,
+    bucket,
+    matchLabel,
+    whyItFits: why,
+    caution,
+    positiveSignals: [...new Set(positiveSignals)].slice(0, 6),
+    cautionSignals: [...new Set(cautionSignals)].slice(0, 6),
+    negativeSignals: [...new Set(negativeSignals)].slice(0, 6),
+    scoreBreakdown: bd,
+    debug: { totalBeforeClamp: Math.round(totalBeforeClamp), appliedRules, capsApplied },
+  };
+}
+
+/** Compact one-liner cache so the legacy adapter can surface it on cards. */
+const legacyShortWhy = new Map<string, string | undefined>();
+
+/** Legacy adapter — derives the old `Recommendation` shape used across the UI. */
+export function scoreFragrance(f: Fragrance, ctx: ScoreContext): Recommendation {
+  const r = scoreFull(f, ctx);
+  return {
+    fragranceId: f.id,
+    match: r.score,
+    whyItFits: r.whyItFits,
+    shortWhy: legacyShortWhy.get(f.id + '|' + ctx.answers.experienceLevel),
+    caution: r.caution,
+    signals: r.positiveSignals.slice(0, 4),
+  };
 }
 
 /** Owned, sampled, sold, or feedback-dismissed fragrances leave the rec pool. */
@@ -648,20 +965,83 @@ function scoredPool(
 // Public, rule-based API
 // ---------------------------------------------------------------------------
 
+/** Full structured score for one fragrance (spec API). `allFragrances` is
+ *  accepted for signature compatibility; the engine uses the global dataset. */
 export function calculateMatchScore(
   fragrance: Fragrance,
   answers: OnboardingAnswers,
-  collection: CollectionItem[]
-): number {
-  return scoreFragrance(fragrance, buildScoreContext(answers, collection)).match;
+  collection: CollectionItem[],
+  _allFragrances: Fragrance[] = fragrances
+): import('../types').RecommendationResult {
+  return scoreFull(fragrance, buildScoreContext(answers, collection));
 }
 
-export function getRecommendationsForUser(
+/** Structured score for a fragrance by id, used by the detail "Why this score?". */
+export function matchResultFor(
+  fragranceId: string,
   answers: OnboardingAnswers,
   collection: CollectionItem[],
   feedback: FeedbackMap = {}
-): Recommendation[] {
-  return scoredPool(answers, collection, feedback).scored.map((s) => s.rec);
+): import('../types').RecommendationResult | undefined {
+  const f = findById(fragranceId);
+  return f ? scoreFull(f, buildScoreContext(answers, collection, feedback)) : undefined;
+}
+
+export interface RecForUserOptions {
+  limit?: number;
+  excludeOwned?: boolean;
+  includeTryList?: boolean;
+}
+
+/** Ranked structured recommendations (spec API). */
+export function getRecommendationsForUser(
+  answers: OnboardingAnswers,
+  collection: CollectionItem[],
+  _allFragrances: Fragrance[] = fragrances,
+  options: RecForUserOptions = {}
+): import('../types').RecommendationResult[] {
+  const { limit, excludeOwned = true, includeTryList = false } = options;
+  const ctx = buildScoreContext(answers, collection, {});
+  const ownedSampledSold = new Set(
+    collection.filter((c) => c.status !== 'wishlist').map((c) => c.fragranceId)
+  );
+  const tryList = new Set(collection.filter((c) => c.status === 'wishlist').map((c) => c.fragranceId));
+  const results = fragrances
+    .filter((f) => {
+      if (excludeOwned && ownedSampledSold.has(f.id)) return false;
+      if (!includeTryList && tryList.has(f.id)) return false;
+      return true;
+    })
+    .map((f) => scoreFull(f, ctx))
+    .sort((a, b) => b.score - a.score);
+  return limit ? results.slice(0, limit) : results;
+}
+
+/** Structured recommendations filtered to a single bucket (spec API). */
+export function getRecommendationsByBucket(
+  bucket: import('../types').RecommendationBucket,
+  answers: OnboardingAnswers,
+  collection: CollectionItem[],
+  allFragrances: Fragrance[] = fragrances
+): import('../types').RecommendationResult[] {
+  return getRecommendationsForUser(answers, collection, allFragrances, {
+    excludeOwned: bucket !== 'redundant_with_collection' && bucket !== 'too_basic_for_you',
+  }).filter((r) => r.bucket === bucket);
+}
+
+/** Breakdown for the "Why this score?" UI (spec API). */
+export function getWhyThisScore(recommendation: import('../types').RecommendationResult): {
+  title: string;
+  positiveSignals: string[];
+  cautionSignals: string[];
+  scoreBreakdown: Record<string, number>;
+} {
+  return {
+    title: `Why ${recommendation.score}%? — ${recommendation.matchLabel}`,
+    positiveSignals: recommendation.positiveSignals,
+    cautionSignals: [...recommendation.cautionSignals, ...recommendation.negativeSignals],
+    scoreBreakdown: recommendation.scoreBreakdown as unknown as Record<string, number>,
+  };
 }
 
 export function getRecommendationReason(fragrance: Fragrance, answers: OnboardingAnswers): string {
