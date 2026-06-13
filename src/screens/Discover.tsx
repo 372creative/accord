@@ -48,11 +48,10 @@ export function Discover() {
                         {list.description}
                       </p>
                     </div>
-                    <div className="text-right shrink-0">
-                      <div className="font-display font-medium text-[16px] text-sage">{overlap}%</div>
-                      <div className="text-[9px] uppercase tracking-[0.14em] text-mute whitespace-nowrap">
+                    <div className="shrink-0 pt-0.5">
+                      <span className="text-[10px] uppercase tracking-[0.14em] text-sage font-display font-medium whitespace-nowrap">
                         {overlapLabel(overlap)}
-                      </div>
+                      </span>
                     </div>
                   </div>
 

@@ -34,7 +34,7 @@ export function ListDetail({ id }: { id: string }) {
           <p className="mt-2.5 text-[14px] text-mute leading-relaxed">{list.description}</p>
           <div className="mt-4 flex items-center gap-3">
             <Chip small tone="sage">
-              {overlap}% overlap · {overlapLabel(overlap)}
+              {overlapLabel(overlap)} for your taste
             </Chip>
             <span className="text-[12px] text-mute">{list.fragranceIds.length} fragrances</span>
           </div>
